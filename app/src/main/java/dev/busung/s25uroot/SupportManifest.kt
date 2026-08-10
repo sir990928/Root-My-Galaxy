@@ -1,4 +1,3 @@
-cat > ~/Root-My-Galaxy/app/src/main/java/dev/busung/s25uroot/SupportManifest.kt << 'ENDOFFILE'
 package dev.busung.s25uroot
 
 import org.json.JSONArray
@@ -64,4 +63,3 @@ data class SupportManifest(val targets: List<TargetProfile>) {
         private fun JSONArray.strings() = buildSet { for (i in 0 until length()) add(getString(i)) }
     }
 }
-ENDOFFILE
