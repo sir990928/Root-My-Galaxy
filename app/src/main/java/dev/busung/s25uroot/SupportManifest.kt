@@ -22,9 +22,9 @@ data class TargetProfile(
     val managers: Map<String, ManagerInfo>,
 ) {
     fun matches(snapshot: DeviceSnapshot) =
-        models.any { it.equals(snapshot.model, ignoreCase = true) } &&
-        snapshot.kernelVersion in kernelVersions
-}
+    models.any { it.equals(snapshot.model, ignoreCase = true) } &&
+    snapshot.kernelRelease in kernelVersions
+
 
 data class SupportManifest(val targets: List<TargetProfile>) {
     companion object {
