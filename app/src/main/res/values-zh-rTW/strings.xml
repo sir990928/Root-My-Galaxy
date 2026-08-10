@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Galaxy Root</string>
+    <string name="app_name">Root My Galaxy</string>
     <string name="nav_overview">首頁</string>
     <string name="nav_history">執行紀錄</string>
     <string name="nav_settings">設定</string>
@@ -117,7 +117,7 @@
     <string name="repo_response_too_large">回應超過大小限制</string>
 
     <string name="open_github">開啟 GitHub</string>
-    <string name="github_card_title">探索 Galaxy Root</string>
+    <string name="github_card_title">探索 Root My Galaxy</string>
     <string name="github_card_description">查看原始碼與使用說明。</string>
 
     <string name="action_continue">忽略並繼續</string>
@@ -150,8 +150,8 @@
     <string name="kernel_version_mismatch_title">核心版本不相符</string>
     <string name="kernel_version_mismatch_body">目前的核心為 %1$s，但所選的 payload 支援 %2$s。偏移量可能不相容。</string>
     <string name="about">關於</string>
-    <string name="about_title">關於 Galaxy Root</string>
-    <string name="about_description">關於 Galaxy Root</string>
+    <string name="about_title">關於 Root My Galaxy</string>
+    <string name="about_description">關於 Root My Galaxy</string>
     <string name="about_body">一鍵安裝器，利用核心漏洞對受支援的三星 Galaxy 裝置進行 root。</string>
     <string name="history_payload">Payload: %1$s</string>
     <string name="export_log">匯出日誌</string>

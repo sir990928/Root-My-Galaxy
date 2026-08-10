@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <resources>
-    <string name="app_name">Root My Galaxy</string>
+    <string name="app_name">Galaxy Root</string>
     <string name="nav_overview">Главная</string>
     <string name="nav_history">История</string>
     <string name="nav_settings">Настройки</string>
@@ -112,7 +112,7 @@
     <string name="repo_url_invalid">Этот репозиторий артефактов не разрешён</string>
     <string name="repo_response_too_large">Ответ превысил допустимый размер</string>
     <string name="open_github">Открыть GitHub</string>
-    <string name="github_card_title">О проекте Root My Galaxy</string>
+    <string name="github_card_title">О проекте Galaxy Root</string>
     <string name="github_card_description">Просмотреть исходный код и инструкции по использованию.</string>
     <string name="action_continue">Всё равно продолжить</string>
     <string name="action_next">Далее</string>
@@ -139,8 +139,8 @@
     <string name="kernel_version_mismatch_title">Несовместимая версия ядра</string>
     <string name="kernel_version_mismatch_body">На этом телефоне используется ядро %1$s, однако выбранный payload поддерживает %2$s. offsets могут быть несовместимы.</string>
     <string name="about">О приложении</string>
-    <string name="about_title">О Root My Galaxy</string>
-    <string name="about_description">О Root My Galaxy</string>
+    <string name="about_title">О Galaxy Root</string>
+    <string name="about_description">О Galaxy Root</string>
     <string name="about_body">Установщик в один клик, использующий эксплойт ядра для рутирования поддерживаемых устройств Samsung Galaxy.</string>
     <string name="history_payload">Payload: %1$s</string>
     <string name="export_log">Экспорт журнала</string>

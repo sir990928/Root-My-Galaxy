@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Root My Galaxy</string>
+    <string name="app_name">Galaxy Root</string>
     <string name="nav_overview">Ana Sayfa</string>
     <string name="nav_history">Geçmiş</string>
     <string name="nav_settings">Ayarlar</string>
@@ -103,7 +103,7 @@
     <string name="repo_url_invalid">Artifact deposuna izin verilmiyor</string>
     <string name="repo_response_too_large">Yanıt boyut sınırını aştı</string>
     <string name="open_github">GitHub\'ı Aç</string>
-    <string name="github_card_title">Root My Galaxy Hakkında</string>
+    <string name="github_card_title">Galaxy Root Hakkında</string>
     <string name="github_card_description">Kaynak kodu ve kullanım talimatlarını görüntüleyin.</string>
     <string name="action_continue">Yine de devam et</string>
     <string name="action_next">İleri</string>
@@ -130,8 +130,8 @@
     <string name="kernel_version_mismatch_title">Kernel sürümü uyumsuzluğu</string>
     <string name="kernel_version_mismatch_body">Bu telefon %1$s kernel kullanıyor, ancak seçilen payload %2$s destekliyor. Ofsetler uyumsuz olabilir.</string>
     <string name="about">Hakkında</string>
-    <string name="about_title">Root My Galaxy Hakkında</string>
-    <string name="about_description">Root My Galaxy hakkında</string>
+    <string name="about_title">Galaxy Root Hakkında</string>
+    <string name="about_description">Galaxy Root hakkında</string>
     <string name="about_body">Desteklenen Samsung Galaxy cihazlarını çekirdek açığı kullanarak tek tıkla root eden yükleyicidir.</string>
     <string name="history_payload">Payload: %1$s</string>
     <string name="export_log">Günlüğü dışa aktar</string>
