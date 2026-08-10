@@ -5,7 +5,7 @@
 -keep class androidx.compose.ui.platform.** { *; }
 
 # 你的代码
--keep class dev.busung.s25uroot.** { *; }
+-keep class com.glaxysu.root.** { *; }
 
 # JNI native 方法强制保留
 -keepclasseswithmembernames class * {

@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Root My Galaxy</string>
+    <string name="app_name">Glaxy Su</string>
     <string name="nav_overview">首頁</string>
     <string name="nav_history">執行紀錄</string>
     <string name="nav_settings">設定</string>
 
     <string name="install_confirm_title">安裝 KernelSU？</string>
+    <string name="root_manager_confirm_title">安裝 %1$s？</string>
+    <string name="root_manager_confirm_body">應用程式將驗證支援設定，然後下載並執行 exploit 與所選 Root payload。</string>
     <string name="install_confirm_body">應用程式將驗證支援設定檔，然後從 GitHub 下載並執行 exploit 與 KernelSU payload。</string>
 
     <string name="action_confirm">確認</string>
@@ -38,6 +40,7 @@
     <string name="language_system">跟隨系統</string>
 
     <string name="color_dynamic">系統動態顏色</string>
+    <string name="color_glaxy">Glaxy Su</string>
     <string name="color_blue">藍色</string>
     <string name="color_violet">紫色</string>
     <string name="color_green">綠色</string>
@@ -158,6 +161,11 @@
     <string name="export_log_saved">日誌已儲存</string>
     <string name="export_log_failed">無法儲存日誌</string>
     <string name="install_tap_open_manager">點擊開啟 KernelSU Manager</string>
+    <string name="root_manager_select_title">選擇 Root 方案</string>
+    <string name="root_manager_kernelsu">KernelSU</string>
+    <string name="root_manager_kernelsu_description">以核心為基礎的 Android Root 方案</string>
+    <string name="root_manager_sukisu">SukiSU Ultra</string>
+    <string name="root_manager_sukisu_description">相容 KernelSU 的 SukiSU Root 方案</string>
     <string name="how_it_works">運作原理</string>
     <string name="kernelsu_card_description">以核心為基礎的 Android Root 解決方案</string>
     <string name="history_shizuku_used">已使用 Shizuku</string>

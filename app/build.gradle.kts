@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "dev.busung.s25uroot"
+    namespace = "com.glaxysu.root"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.busung.s25uroot"
+        applicationId = "com.glaxysu.root"
         minSdk = 33
         targetSdk = 36
         versionCode = 12
@@ -84,10 +84,10 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.5.0-alpha24")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.materialkolor:material-kolor:4.1.1")
+    implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
+    implementation("com.github.MuntashirAkon:sun-security-android:1.1")
+    implementation("org.conscrypt:conscrypt-android:2.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    implementation("dev.rikka.shizuku:api:13.1.5")
-    implementation("dev.rikka.shizuku:provider:13.1.5")
-
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:core-ktx:1.7.0")

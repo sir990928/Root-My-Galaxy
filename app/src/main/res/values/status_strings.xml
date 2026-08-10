@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="status_root_active_format">%1$s active</string>
+</resources>

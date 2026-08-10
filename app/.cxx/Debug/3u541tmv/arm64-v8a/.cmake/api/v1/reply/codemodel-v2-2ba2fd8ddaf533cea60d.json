@@ -1,0 +1,60 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10.0"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "s25u_native",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "s25u_native::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-s25u_native-Debug-a3ffa47264abec2a5ff0.json",
+					"name" : "s25u_native",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/Users/lin/Documents/Codex/2026-08-10/ww/work/Root-My-Galaxy-user/Root-My-Galaxy-main/app/.cxx/Debug/3u541tmv/arm64-v8a",
+		"source" : "C:/Users/lin/Documents/Codex/2026-08-10/ww/work/Root-My-Galaxy-user/Root-My-Galaxy-main/app/src/main/cpp"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

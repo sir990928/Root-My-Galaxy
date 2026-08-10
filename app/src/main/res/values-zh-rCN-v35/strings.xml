@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wireless_debugging">无线调试</string>
+    <string name="wireless_debugging_description">配对一次，之后安装时自动连接</string>
+    <string name="wireless_debugging_first_time">首次请手动连接</string>
+    <string name="wireless_debugging_connected">已连接</string>
+    <string name="wireless_debugging_title">连接无线调试</string>
+    <string name="wireless_debugging_body">请打开无线调试，然后选择“使用配对码配对设备”。配对码会通过通知输入。</string>
+    <string name="wireless_debugging_pair_code">配对码</string>
+    <string name="wireless_debugging_pair">配对并连接</string>
+    <string name="wireless_debugging_pairing">正在配对…</string>
+    <string name="wireless_debugging_open_settings">打开开发者选项</string>
+    <string name="wireless_debugging_notification_title">Glaxy Su 无线调试</string>
+    <string name="wireless_debugging_notification_body">请输入无线调试页面显示的六位配对码。</string>
+    <string name="wireless_debugging_notification_submit">提交配对码</string>
+    <string name="wireless_debugging_notification_pairing">正在配对无线调试…</string>
+    <string name="wireless_debugging_notification_connected">无线调试已连接</string>
+    <string name="wireless_debugging_notification_failed">无线调试配对失败</string>
+    <string name="wireless_debugging_notification_ready">Glaxy Su 已准备好安装</string>
+    <string name="error_wireless_adb_unavailable">无线调试未连接，请先在设置中完成一次配对。</string>
+    <string name="error_exploit_stream">exploit 输出流中断：%1$s</string>
+</resources>

@@ -1,0 +1,7 @@
+[
+{
+  "directory": "C:/Users/lin/Documents/Codex/2026-08-10/ww/work/Root-My-Galaxy-user/Root-My-Galaxy-main/app/.cxx/Debug/3u541tmv/arm64-v8a",
+  "command": "C:\\Users\\lin\\Documents\\Codex\\2026-08-08\\github\\work\\android-sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android33 --sysroot=C:/Users/lin/Documents/Codex/2026-08-08/github/work/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Ds25u_native_EXPORTS -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -O2 -Wall -Wextra -Werror -o CMakeFiles\\s25u_native.dir\\native_probe.c.o -c C:\\Users\\lin\\Documents\\Codex\\2026-08-10\\ww\\work\\Root-My-Galaxy-user\\Root-My-Galaxy-main\\app\\src\\main\\cpp\\native_probe.c",
+  "file": "C:\\Users\\lin\\Documents\\Codex\\2026-08-10\\ww\\work\\Root-My-Galaxy-user\\Root-My-Galaxy-main\\app\\src\\main\\cpp\\native_probe.c"
+}
+]
