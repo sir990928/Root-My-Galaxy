@@ -125,7 +125,7 @@ object AppPreferences {
 
     fun wirelessAdbMode(context: Context): Boolean =
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-            .getBoolean(WIRELESS_ADB_MODE, false)
+            .getBoolean(WIRELESS_ADB_MODE, true)
 
     fun setWirelessAdbMode(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
