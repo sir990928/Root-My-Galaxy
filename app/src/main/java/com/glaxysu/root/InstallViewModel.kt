@@ -81,7 +81,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                } catch (e: Exception) {
                   appendLog("[*] Wireless failed: ${e.message}")
                    false
-}
+                }
                 setPhase(InstallPhase.Checking, app.getString(R.string.status_checking_github))
                 val profile = if (profileId == null) repository.resolveTarget(DeviceSnapshot.current()) else repository.resolveTarget(profileId)
                 appendLog(app.getString(R.string.log_profile, profile.profileId))
@@ -205,35 +205,72 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         val ksudName = payloads.kernelSu.name
         val ksudPath = "$TMP_PATH/$ksudName"
 
+        // 推送 ksud 到设备
         if (useWireless) {
             val stagedKsud = stageToTmp(payloads.kernelSu, ksudName)
             require(stagedKsud.code == 0) { app.getString(R.string.error_ksu_stage, stagedKsud.output) }
         } else {
-            runLocal("cp ${shellQuote(payloads.kernelSu.absolutePath)} $ksudPath && chmod 755 $ksudPath")
+            val result = runLocal("cp ${shellQuote(payloads.kernelSu.absolutePath)} $ksudPath && chmod 755 $ksudPath")
+            require(result.code == 0) { "Failed to stage ksud: ${result.output}" }
         }
         appendLog("[+] ksud staged: $ksudPath")
 
         if (isSukisu) {
             val koFile = payloads.kernelModule ?: error("SukiSU kernel module is unavailable")
             val koName = koFile.name; val koPath = "$TMP_PATH/$koName"
+            
+            // 推送 ko 到设备
             if (useWireless) {
                 val stagedKo = stageToTmp(koFile, koName)
                 require(stagedKo.code == 0) { app.getString(R.string.error_ksu_stage, stagedKo.output) }
             } else {
-                runLocal("cp ${shellQuote(koFile.absolutePath)} $koPath && chmod 755 $koPath")
+                val result = runLocal("cp ${shellQuote(koFile.absolutePath)} $koPath && chmod 755 $koPath")
+                require(result.code == 0) { "Failed to stage ko: ${result.output}" }
             }
             appendLog("[+] SukiSU module staged: $koPath")
             
-            // 1. late-load
-            runLocal(lateLoadCommand(ksudName, false))
+            // exp 过后统一用本地 runLocal
+            // 1. late-load + mount bind
+            val lateResult = runLocal(lateLoadCommand(ksudName, false))
+            require(lateResult.code == 0) { "late-load failed: ${lateResult.output}" }
+            appendLog("[+] late-load completed")
+            
+            // 验证 mount bind
+            val mountCheck = runLocal("mount | grep /system/bin/logcat")
+            require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
+                "Mount bind failed! logcat not replaced. Output: ${mountCheck.output}"
+            }
+            appendLog("[+] mount bind verified")
+            
             // 2. 复制 .ko 到 /dev
-            runLocal("cat ${shellQuote(koPath)} > /dev/sukisu.ko")
+            val catResult = runLocal("cat ${shellQuote(koPath)} > /dev/sukisu.ko")
+            require(catResult.code == 0) { "Failed to write ko: ${catResult.output}" }
+            appendLog("[+] ko written to /dev/sukisu.ko")
+            
             // 3. insmod 加载
-            runLocal("logcat insmod /dev/sukisu.ko")
-            appendLog("[+] SukiSU loaded")
+            val insmodResult = runLocal("logcat insmod /dev/sukisu.ko")
+            require(insmodResult.code == 0) { "insmod failed: ${insmodResult.output}" }
+            
+            // 验证模块加载
+            val moduleCheck = runLocal("cat /proc/modules | grep sukisu")
+            require(moduleCheck.code == 0 && moduleCheck.output.contains("sukisu")) {
+                "Module not loaded in kernel! ${moduleCheck.output}"
+            }
+            appendLog("[+] SukiSU loaded and verified in kernel")
+            
         } else {
-            runLocal(lateLoadCommand(ksudName, true))
+            // 普通 KernelSU
+            val result = runLocal(lateLoadCommand(ksudName, true))
+            require(result.code == 0) { "late-load failed: ${result.output}" }
+            
+            // 验证 mount bind
+            val mountCheck = runLocal("mount | grep /system/bin/logcat")
+            require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
+                "Mount bind failed! Output: ${mountCheck.output}"
+            }
+            appendLog("[+] KernelSU late-load completed")
         }
+        
         storeInstallReceipt()
         appendLog(app.getString(R.string.log_ksu_control_verified))
     }
@@ -248,10 +285,20 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         return "ln -sf $TMP_PATH/$ksudName $TMP_PATH/ksud-selected && mount --bind $TMP_PATH/ksud-selected /system/bin/logcat && logcat late-load$ep"
     }
     
-    private fun runLocal(cmd: String) {
+    private fun runLocal(cmd: String): CommandResult {
         val helper = helperFile()
-        val process = ProcessBuilder(helper.absolutePath, "-c", cmd).redirectErrorStream(true).start()
-        process.waitFor()
+        val process = ProcessBuilder(helper.absolutePath, "-c", cmd)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }
+        val exitCode = process.waitFor()
+        
+        if (exitCode != 0) {
+            appendLog("[-] Local cmd failed (exit=$exitCode): $cmd")
+            if (output.isNotBlank()) appendLog("[-] ${output.take(500)}")
+        }
+        
+        return CommandResult(exitCode, stripAnsi(output.trim()))
     }
 
     private fun detectInstalled(): Boolean {
