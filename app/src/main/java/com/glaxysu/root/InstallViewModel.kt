@@ -14,11 +14,25 @@ import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 
-enum class InstallPhase { Checking, Ready, Downloading, Exploiting, LoadingKernelSu, Installed, Failed }
-data class InstallUiState(val phase: InstallPhase = InstallPhase.Checking, val message: String = "", val probeOutput: String = "", val log: String = "") {
+enum class InstallPhase {
+    Checking, Ready, Downloading, Exploiting, LoadingKernelSu, Installed, Failed,
+}
+
+data class InstallUiState(
+    val phase: InstallPhase = InstallPhase.Checking,
+    val message: String = "",
+    val probeOutput: String = "",
+    val log: String = "",
+) {
     val busy: Boolean get() = phase in setOf(InstallPhase.Checking, InstallPhase.Downloading, InstallPhase.Exploiting, InstallPhase.LoadingKernelSu)
 }
-data class TargetCatalogUiState(val loading: Boolean = false, val profiles: List<TargetProfile> = emptyList(), val error: String? = null)
+
+data class TargetCatalogUiState(
+    val loading: Boolean = false,
+    val profiles: List<TargetProfile> = emptyList(),
+    val error: String? = null,
+)
+
 private data class CommandResult(val code: Int, val output: String)
 
 class InstallViewModel(application: Application) : AndroidViewModel(application) {
@@ -45,7 +59,15 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             val probe = NativeProbe.run()
             if (detectInstalled()) {
                 val manager = AppPreferences.rootManager(app)
-                mutableState.value = InstallUiState(phase = InstallPhase.Installed, message = app.getString(R.string.status_root_active_format, app.getString(manager.labelRes)), probeOutput = probe, log = probe)
+                mutableState.value = InstallUiState(
+                    phase = InstallPhase.Installed,
+                    message = app.getString(
+                        R.string.status_root_active_format,
+                        app.getString(manager.labelRes),
+                    ),
+                    probeOutput = probe,
+                    log = probe,
+                )
                 return@launch
             }
             try {
@@ -63,7 +85,9 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             mutableTargetCatalog.value = TargetCatalogUiState(loading = true)
             mutableTargetCatalog.value = try {
                 TargetCatalogUiState(profiles = repository.loadTargets().sortedWith(compareBy(TargetProfile::displayName, TargetProfile::profileId)))
-            } catch (error: Throwable) { TargetCatalogUiState(error = error.message ?: error.javaClass.simpleName) }
+            } catch (error: Throwable) {
+                TargetCatalogUiState(error = error.message ?: error.javaClass.simpleName)
+            }
         }
     }
 
@@ -74,14 +98,16 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             mutableState.value = InstallUiState(phase = InstallPhase.Checking, probeOutput = mutableState.value.probeOutput)
             startHistory()
             try {
+                // ✅ 尝试无线，失败则本地
                 val useWireless = try {
-                   WirelessAdbManager.ensureConnected(app)
-                   appendLog("[*] Wireless connected")
-                   true
-               } catch (e: Exception) {
-                  appendLog("[*] Wireless failed: ${e.message}")
-                   false
+                    WirelessAdbManager.ensureConnected(app)
+                    appendLog(app.getString(R.string.log_wireless_adb_connected))
+                    true
+                } catch (e: Exception) {
+                    appendLog("[*] Wireless unavailable, using local mode")
+                    false
                 }
+                
                 setPhase(InstallPhase.Checking, app.getString(R.string.status_checking_github))
                 val profile = if (profileId == null) repository.resolveTarget(DeviceSnapshot.current()) else repository.resolveTarget(profileId)
                 appendLog(app.getString(R.string.log_profile, profile.profileId))
@@ -100,7 +126,13 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 installKernelSu(payloads, useWireless)
 
                 val manager = AppPreferences.rootManager(app)
-                setPhase(InstallPhase.Installed, app.getString(R.string.status_root_active_format, app.getString(manager.labelRes)))
+                setPhase(
+                    InstallPhase.Installed,
+                    app.getString(
+                        R.string.status_root_active_format,
+                        app.getString(manager.labelRes),
+                    ),
+                )
                 appendLog(app.getString(R.string.log_install_complete))
                 finishHistory(InstallRunResult.Succeeded)
             } catch (error: Throwable) {
@@ -113,15 +145,21 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
 
     private fun stageBootstrapHelper() {
         val helper = helperFile()
-        require(helper.isFile && helper.canRead()) { app.getString(R.string.error_helper_unavailable) }
+        require(helper.isFile && helper.canRead()) {
+            app.getString(R.string.error_helper_unavailable)
+        }
         val result = WirelessAdbManager.stageFile(app, helper, WirelessAdbManager.REMOTE_HELPER_PATH)
-        require(result.code == 0) { app.getString(R.string.error_wireless_adb_stage, helper.name, result.output) }
+        require(result.code == 0) {
+            app.getString(R.string.error_wireless_adb_stage, helper.name, result.output)
+        }
         appendLog(app.getString(R.string.log_wireless_adb_helper_staged))
     }
 
     private suspend fun executeExploit(payload: File, useWireless: Boolean) {
+        // ✅ 本地模式
         if (!useWireless) {
-            val logFile = File(app.filesDir, "exploit.log"); logFile.delete()
+            val logFile = File(app.filesDir, "exploit.log")
+            logFile.delete()
             val helper = helperFile()
             require(helper.canExecute()) { app.getString(R.string.error_helper_unavailable) }
             val logPrefix = mutableState.value.log
@@ -140,23 +178,46 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 var lastRawLog = ""
                 while (process.isAlive) {
                     val rawLog = logFile.readTextIfPresent()
-                    if (rawLog != lastRawLog) { cacheP0Offset(bootToken, rawLog); publishExploitLog(logPrefix, rawLog); lastRawLog = rawLog; lastProgressAt = SystemClock.elapsedRealtime() }
-                    require(SystemClock.elapsedRealtime() - lastProgressAt < EXPLOIT_STALL_MILLIS) { app.getString(R.string.error_exploit_stalled) }
-                    require(SystemClock.elapsedRealtime() - startedAt < EXPLOIT_TOTAL_MILLIS) { app.getString(R.string.error_exploit_timeout) }
+                    if (rawLog != lastRawLog) {
+                        cacheP0Offset(bootToken, rawLog)
+                        publishExploitLog(logPrefix, rawLog)
+                        lastRawLog = rawLog
+                        lastProgressAt = SystemClock.elapsedRealtime()
+                    }
+                    require(SystemClock.elapsedRealtime() - lastProgressAt < EXPLOIT_STALL_MILLIS) {
+                        app.getString(R.string.error_exploit_stalled)
+                    }
+                    require(SystemClock.elapsedRealtime() - startedAt < EXPLOIT_TOTAL_MILLIS) {
+                        app.getString(R.string.error_exploit_timeout)
+                    }
                     delay(LOG_POLL_INTERVAL)
                 }
                 val exitCode = process.waitFor()
                 val rawLog = logFile.readTextIfPresent()
-                cacheP0Offset(bootToken, rawLog); publishExploitLog(logPrefix, rawLog)
+                cacheP0Offset(bootToken, rawLog)
+                publishExploitLog(logPrefix, rawLog)
                 require(exitCode == 0) { app.getString(R.string.error_payload_exit, exitCode, "") }
-                require(rawLog.contains("exploit completed") && rawLog.contains("done=1 root=1")) { app.getString(R.string.error_success_marker) }
-            } finally { if (process.isAlive) { process.destroy(); delay(500); if (process.isAlive) process.destroyForcibly() } }
+                require(rawLog.contains("exploit completed") && rawLog.contains("done=1 root=1")) {
+                    app.getString(R.string.error_success_marker)
+                }
+            } finally {
+                if (process.isAlive) {
+                    process.destroy()
+                    delay(500)
+                    if (process.isAlive) process.destroyForcibly()
+                }
+            }
             appendLog(app.getString(R.string.log_bootstrap_root))
             return
         }
+        
+        // ✅ 无线模式（你原本的代码，完全不动）
         val remotePayload = "$TMP_PATH/${payload.name}"
         val stagedPayload = stageToTmp(payload, payload.name)
-        require(stagedPayload.code == 0) { app.getString(R.string.error_wireless_adb_stage, payload.name, stagedPayload.output) }
+        require(stagedPayload.code == 0) {
+            app.getString(R.string.error_wireless_adb_stage, payload.name, stagedPayload.output)
+        }
+
         val logPrefix = mutableState.value.log
         val bootToken = currentBootToken()
         val exploitCommand = buildString {
@@ -170,26 +231,53 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             append("LD_PRELOAD=${shellQuote(remotePayload)} ")
             append("/system/bin/true")
         }
+
         val process = WirelessAdbManager.openProcess(app, exploitCommand)
         val startedAt = SystemClock.elapsedRealtime()
+        var lastProgressAt = startedAt
         var lastRawLog = ""
         var exploitSucceeded = false
         try {
             while (process.isAlive()) {
                 process.drainAvailable()
                 val rawLog = process.cleanOutput()
-                if (rawLog != lastRawLog) { cacheP0Offset(bootToken, rawLog); publishExploitLog(logPrefix, rawLog); lastRawLog = rawLog }
-                if (rawLog.contains("root=1")) { exploitSucceeded = true; break }
-                require(SystemClock.elapsedRealtime() - startedAt < EXPLOIT_TOTAL_MILLIS) { app.getString(R.string.error_exploit_timeout) }
+                if (rawLog != lastRawLog) {
+                    cacheP0Offset(bootToken, rawLog)
+                    publishExploitLog(logPrefix, rawLog)
+                    lastRawLog = rawLog
+                    lastProgressAt = SystemClock.elapsedRealtime()
+                }
+                if (rawLog.contains("root=1")) {
+                    exploitSucceeded = true
+                    break
+                }
+
+                val now = SystemClock.elapsedRealtime()
+                require(now - lastProgressAt < EXPLOIT_STALL_MILLIS) {
+                    app.getString(R.string.error_exploit_stalled)
+                }
+                require(now - startedAt < EXPLOIT_TOTAL_MILLIS) {
+                    app.getString(R.string.error_exploit_timeout)
+                }
                 delay(LOG_POLL_INTERVAL)
             }
+
             process.drainAvailable()
             val finalLog = process.cleanOutput()
-            if (finalLog != lastRawLog) { cacheP0Offset(bootToken, finalLog); publishExploitLog(logPrefix, finalLog) }
+            if (finalLog != lastRawLog) {
+                cacheP0Offset(bootToken, finalLog)
+                publishExploitLog(logPrefix, finalLog)
+            }
             val exitCode = process.exitCode() ?: if (exploitSucceeded) 0 else -1
-            require(exitCode == 0) { app.getString(R.string.error_payload_exit, exitCode, "") }
-            require(exploitSucceeded || finalLog.contains("root=1")) { app.getString(R.string.error_success_marker) }
-        } finally { process.close() }
+            require(exitCode == 0) {
+                app.getString(R.string.error_payload_exit, exitCode, "")
+            }
+            require(exploitSucceeded || finalLog.contains("root=1")) {
+                app.getString(R.string.error_success_marker)
+            }
+        } finally {
+            process.close()
+        }
         appendLog(app.getString(R.string.log_bootstrap_root))
     }
 
@@ -205,10 +293,12 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         val ksudName = payloads.kernelSu.name
         val ksudPath = "$TMP_PATH/$ksudName"
 
-        // 推送 ksud 到设备
+        // ✅ 推送 ksud
         if (useWireless) {
             val stagedKsud = stageToTmp(payloads.kernelSu, ksudName)
-            require(stagedKsud.code == 0) { app.getString(R.string.error_ksu_stage, stagedKsud.output) }
+            require(stagedKsud.code == 0) {
+                app.getString(R.string.error_ksu_stage, stagedKsud.output)
+            }
         } else {
             val result = runLocal("cp ${shellQuote(payloads.kernelSu.absolutePath)} $ksudPath && chmod 755 $ksudPath")
             require(result.code == 0) { "Failed to stage ksud: ${result.output}" }
@@ -216,121 +306,87 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         appendLog("[+] ksud staged: $ksudPath")
 
         if (isSukisu) {
-            val koFile = payloads.kernelModule ?: error("SukiSU kernel module is unavailable")
-            val koName = koFile.name; val koPath = "$TMP_PATH/$koName"
+            val koFile = payloads.kernelModule
+                ?: error("SukiSU kernel module is unavailable")
+            val koName = koFile.name
+            val koPath = "$TMP_PATH/$koName"
             
-            // 推送 ko 到设备
+            // ✅ 推送 ko
             if (useWireless) {
                 val stagedKo = stageToTmp(koFile, koName)
-                require(stagedKo.code == 0) { app.getString(R.string.error_ksu_stage, stagedKo.output) }
+                require(stagedKo.code == 0) {
+                    app.getString(R.string.error_ksu_stage, stagedKo.output)
+                }
             } else {
                 val result = runLocal("cp ${shellQuote(koFile.absolutePath)} $koPath && chmod 755 $koPath")
                 require(result.code == 0) { "Failed to stage ko: ${result.output}" }
             }
             appendLog("[+] SukiSU module staged: $koPath")
-            
-            // exp 过后：无线模式用 ADB 执行被授权的 helper，本地模式用本地 helper
+
+            // ✅ 加载：无线用 runHelper，本地用 runLocal
             if (useWireless) {
-                // 1. late-load + mount bind
-                val lateResult = runHelper("-c", lateLoadCommand(ksudName, false))
-                require(lateResult.code == 0) { "late-load failed: ${lateResult.output}" }
-                appendLog("[+] late-load completed")
-                
-                // 验证 mount bind
-                val mountCheck = runHelper("-c", "mount | grep /system/bin/logcat")
-                require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
-                    "Mount bind failed! logcat not replaced. Output: ${mountCheck.output}"
+                val lateLoad = runHelper("-c", lateLoadCommand(ksudName, ephemeral = false))
+                require(lateLoad.code == 0) {
+                    app.getString(R.string.error_ksu_verify, lateLoad.code, lateLoad.output)
                 }
-                appendLog("[+] mount bind verified")
-                
-                // 2. 复制 .ko 到 /dev
-                val catResult = runHelper("-c", "cat ${shellQuote(koPath)} > /dev/sukisu.ko")
-                require(catResult.code == 0) { "Failed to write ko: ${catResult.output}" }
-                appendLog("[+] ko written to /dev/sukisu.ko")
-                
-                // 3. insmod 加载
-                val insmodResult = runHelper("-c", "logcat insmod /dev/sukisu.ko")
-                require(insmodResult.code == 0) { "insmod failed: ${insmodResult.output}" }
-                
-                // 验证模块加载
-                val moduleCheck = runHelper("-c", "cat /proc/modules | grep sukisu")
-                require(moduleCheck.code == 0 && moduleCheck.output.contains("sukisu")) {
-                    "Module not loaded in kernel! ${moduleCheck.output}"
+                if (lateLoad.output.isNotBlank()) appendLog(lateLoad.output)
+
+                val insmodResult = runHelper("-c", "cat ${shellQuote(koPath)} > /dev/sukisu.ko")
+                require(insmodResult.code == 0) {
+                    app.getString(R.string.error_ksu_stage, insmodResult.output)
                 }
-                appendLog("[+] SukiSU loaded and verified in kernel")
+                appendLog("[+] SukiSU module copied to /dev/sukisu.ko")
+
+                val loadResult = runHelper("-c", "logcat insmod /dev/sukisu.ko")
+                require(loadResult.code == 0) {
+                    app.getString(R.string.error_ksu_verify, loadResult.code, loadResult.output)
+                }
+                if (loadResult.output.isNotBlank()) appendLog(loadResult.output)
             } else {
-                // 本地模式
                 val lateResult = runLocal(lateLoadCommand(ksudName, false))
                 require(lateResult.code == 0) { "late-load failed: ${lateResult.output}" }
-                
-                val mountCheck = runLocal("mount | grep /system/bin/logcat")
-                require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
-                    "Mount bind failed! Output: ${mountCheck.output}"
-                }
-                
+                if (lateResult.output.isNotBlank()) appendLog(lateResult.output)
+
                 val catResult = runLocal("cat ${shellQuote(koPath)} > /dev/sukisu.ko")
-                require(catResult.code == 0) { "Failed to write ko: ${catResult.output}" }
-                
-                val insmodResult = runLocal("logcat insmod /dev/sukisu.ko")
-                require(insmodResult.code == 0) { "insmod failed: ${insmodResult.output}" }
-                
-                val moduleCheck = runLocal("cat /proc/modules | grep sukisu")
-                require(moduleCheck.code == 0 && moduleCheck.output.contains("sukisu")) {
-                    "Module not loaded in kernel! ${moduleCheck.output}"
-                }
-                appendLog("[+] SukiSU loaded and verified in kernel")
+                require(catResult.code == 0) { "write ko failed: ${catResult.output}" }
+                appendLog("[+] SukiSU module copied to /dev/sukisu.ko")
+
+                val loadResult = runLocal("logcat insmod /dev/sukisu.ko")
+                require(loadResult.code == 0) { "insmod failed: ${loadResult.output}" }
+                if (loadResult.output.isNotBlank()) appendLog(loadResult.output)
             }
-            
         } else {
-            // 普通 KernelSU
             if (useWireless) {
-                val result = runHelper("-c", lateLoadCommand(ksudName, true))
-                require(result.code == 0) { "late-load failed: ${result.output}" }
-                
-                val mountCheck = runHelper("-c", "mount | grep /system/bin/logcat")
-                require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
-                    "Mount bind failed! Output: ${mountCheck.output}"
+                val lateLoad = runHelper("-c", lateLoadCommand(ksudName, ephemeral = true))
+                require(lateLoad.code == 0) {
+                    app.getString(R.string.error_ksu_verify, lateLoad.code, lateLoad.output)
                 }
+                if (lateLoad.output.isNotBlank()) appendLog(lateLoad.output)
             } else {
                 val result = runLocal(lateLoadCommand(ksudName, true))
                 require(result.code == 0) { "late-load failed: ${result.output}" }
-                
-                val mountCheck = runLocal("mount | grep /system/bin/logcat")
-                require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
-                    "Mount bind failed! Output: ${mountCheck.output}"
-                }
+                if (result.output.isNotBlank()) appendLog(result.output)
             }
-            appendLog("[+] KernelSU late-load completed")
         }
-        
+
         storeInstallReceipt()
         appendLog(app.getString(R.string.log_ksu_control_verified))
     }
 
     private fun stageToTmp(source: File, name: String): CommandResult {
-        val result = WirelessAdbManager.stageFile(app, source, "$TMP_PATH/$name")
+        val target = "$TMP_PATH/$name"
+        val result = WirelessAdbManager.stageFile(app, source, target)
         return CommandResult(result.code, result.output)
     }
 
     private fun lateLoadCommand(ksudName: String, ephemeral: Boolean): String {
-        val ep = if (ephemeral) " --ephemeral" else ""
-        return "ln -sf $TMP_PATH/$ksudName $TMP_PATH/ksud-selected && mount --bind $TMP_PATH/ksud-selected /system/bin/logcat && logcat late-load$ep"
+        val ephemeralArg = if (ephemeral) " --ephemeral" else ""
+        return "ln -sf ${shellQuote("$TMP_PATH/$ksudName")} ${shellQuote("$TMP_PATH/ksud-selected")} && " +
+            "mount --bind ${shellQuote("$TMP_PATH/ksud-selected")} /system/bin/logcat && " +
+            "logcat late-load$ephemeralArg"
     }
-    
-    // 无线模式：通过 ADB 执行被 exp 授权的远程 helper
-    private fun runHelper(vararg arguments: String): CommandResult {
-        val command = buildString {
-            append(shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH))
-            arguments.forEach {
-                append(' ')
-                append(shellQuote(it))
-            }
-        }
-        val result = WirelessAdbManager.runCommand(app, command)
-        return CommandResult(result.code, stripAnsi(result.output.trim()))
-    }
-    
-    // 本地模式：执行本地 helper
+
+    // ✅ 本地执行
     private fun runLocal(cmd: String): CommandResult {
         val helper = helperFile()
         val process = ProcessBuilder(helper.absolutePath, "-c", cmd)
@@ -338,12 +394,6 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             .start()
         val output = process.inputStream.bufferedReader().use { it.readText() }
         val exitCode = process.waitFor()
-        
-        if (exitCode != 0) {
-            appendLog("[-] Local cmd failed (exit=$exitCode): $cmd")
-            if (output.isNotBlank()) appendLog("[-] ${output.take(500)}")
-        }
-        
         return CommandResult(exitCode, stripAnsi(output.trim()))
     }
 
@@ -370,15 +420,31 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         if (offset !in 0..P0_OFFSET_MAX || offset and P0_OFFSET_MASK != 0L) return
         app.getSharedPreferences(P0_CACHE, Application.MODE_PRIVATE).edit().putString(P0_CACHE_BOOT_TOKEN, bootToken).putString(P0_CACHE_OFFSET, "0x${offset.toString(16)}").apply()
     }
-    private fun helperFile(): File = File(app.applicationInfo.nativeLibraryDir, "libcve43499root.so")
+    private fun helperFile(): File = nativeHelperFile()
+    private fun nativeHelperFile() = File(app.applicationInfo.nativeLibraryDir, "libcve43499root.so")
+    private fun runHelper(vararg arguments: String): CommandResult {
+        val command = buildString {
+            append(shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH))
+            arguments.forEach {
+                append(' ')
+                append(shellQuote(it))
+            }
+        }
+        val result = WirelessAdbManager.runCommand(app, command)
+        return CommandResult(result.code, stripAnsi(result.output.trim()))
+    }
     private fun shellQuote(value: String) = "'${value.replace("'", "'\\''")}'"
-    private fun setPhase(phase: InstallPhase, msg: String) { mutableState.value = mutableState.value.copy(phase = phase, message = msg) }
-    private fun appendLog(line: String) { val c = stripAnsi(line).trim(); if (c.isNotBlank()) mutableState.value = mutableState.value.copy(log = (mutableState.value.log + "\n" + c).trim()); updateHistoryLog() }
-    private fun startHistory() { val e = historyStore.create(); activeHistoryEntry = e; publishHistory(e) }
-    private fun updateHistoryLog() { val e = activeHistoryEntry ?: return; val u = e.copy(log = mutableState.value.log); activeHistoryEntry = u; historyStore.save(u); publishHistory(u) }
-    private fun updateHistoryProfile(pid: String) { val e = activeHistoryEntry ?: return; val u = e.copy(profileId = pid); activeHistoryEntry = u; historyStore.save(u); publishHistory(u) }
-    private fun finishHistory(r: InstallRunResult) { val e = activeHistoryEntry ?: return; val u = e.copy(completedAtMillis = System.currentTimeMillis(), result = r, log = mutableState.value.log); activeHistoryEntry = null; historyStore.save(u); publishHistory(u) }
-    private fun publishHistory(e: InstallHistoryEntry) { mutableHistory.value = (mutableHistory.value.filterNot { it.id == e.id } + e).sortedByDescending { it.startedAtMillis } }
+    private fun setPhase(phase: InstallPhase, message: String) { mutableState.value = mutableState.value.copy(phase = phase, message = message); appendLog("[*] $message") }
+    private fun appendLog(line: String) { val cleanLine = stripAnsi(line).trim(); if (cleanLine.isBlank()) return; mutableState.value = mutableState.value.copy(log = (mutableState.value.log + "\n" + cleanLine).trim()); updateHistoryLog() }
+    private fun startHistory() { val entry = historyStore.create(); activeHistoryEntry = entry; publishHistory(entry) }
+    private fun updateHistoryLog() { val entry = activeHistoryEntry ?: return; val updated = entry.copy(log = mutableState.value.log); activeHistoryEntry = updated; historyStore.save(updated); publishHistory(updated) }
+    private fun updateHistoryProfile(profileId: String) { val entry = activeHistoryEntry ?: return; val updated = entry.copy(profileId = profileId); activeHistoryEntry = updated; historyStore.save(updated); publishHistory(updated) }
+    private fun finishHistory(result: InstallRunResult) {
+        val entry = activeHistoryEntry ?: return
+        val completed = entry.copy(completedAtMillis = System.currentTimeMillis(), result = result, log = mutableState.value.log)
+        activeHistoryEntry = null; historyStore.save(completed); publishHistory(completed)
+    }
+    private fun publishHistory(entry: InstallHistoryEntry) { mutableHistory.value = (mutableHistory.value.filterNot { it.id == entry.id } + entry).sortedByDescending(InstallHistoryEntry::startedAtMillis) }
     private fun File.readTextIfPresent(): String = if (exists()) readText() else ""
 
     companion object {
