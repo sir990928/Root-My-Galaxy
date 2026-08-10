@@ -141,7 +141,7 @@ class PayloadRepository(private val context: Context) {
 
     companion object {
         private const val COMMIT_API_URL =
-            "https://gitee.com/api/v5/repos/lin0928/samsung-root/commits/main""
+            "https://api.github.com/repos/BuSung-dev/Root-My-Galaxy-Payloads/git/ref/heads/main"
         private const val RAW_REPOSITORY =
             "https://gitee.com/lin0928/samsung-root/raw"
         private const val MUTABLE_RAW_PREFIX = "$RAW_REPOSITORY/main/"
