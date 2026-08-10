@@ -26,13 +26,7 @@ data class InstallUiState(
     val probeOutput: String = "",
     val log: String = "",
 ) {
-    val busy: Boolean
-        get() = phase in setOf(
-            InstallPhase.Checking,
-            InstallPhase.Downloading,
-            InstallPhase.Exploiting,
-            InstallPhase.LoadingKernelSu,
-        )
+    val busy: Boolean get() = phase in setOf(InstallPhase.Checking, InstallPhase.Downloading, InstallPhase.Exploiting, InstallPhase.LoadingKernelSu)
 }
 
 data class TargetCatalogUiState(
@@ -203,22 +197,10 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         val ksudName = if (isSukisu) "sukisu-ksud" else "kernelsu-ksud"
         val lateArg = if (isSukisu) "late-load" else "late-load --ephemeral"
 
-        if (shizukuEnabled()) {
-            shizukuStage(payloads.kernelSu, SHIZUKU_KSUD_PATH, "755")
-            shizukuStage(payloads.kernelSu, SHIZUKU_KSUD_STAGE_PATH, "755")
-            appendLog(app.getString(R.string.log_ksu_staged))
-        } else {
-            val source = shellQuote(payloads.kernelSu.absolutePath)
-            val stageCommand = "/system/bin/cp $source /data/local/tmp/$ksudName && /system/bin/cp $source /data/local/tmp/.ksud-stage && /system/bin/chmod 755 /data/local/tmp/$ksudName /data/local/tmp/.ksud-stage"
-            val stage = runHelper("-c", stageCommand)
-            require(stage.code == 0) { app.getString(R.string.error_ksu_stage, stage.output) }
-            appendLog(app.getString(R.string.log_ksu_staged))
-        }
-
         if (isSukisu) {
             val koFile = File(app.filesDir, "sukisu.ko")
             if (koFile.exists()) {
-                appendLog("[*] Loading kernel module...")
+                appendLog("[*] Loading KO...")
                 val koResult = runHelper("-c", "cat ${shellQuote(koFile.absolutePath)} > /dev/sukisu.ko && logcat insmod /dev/sukisu.ko")
                 appendLog("[*] KO loaded: ${koResult.output}")
             }
