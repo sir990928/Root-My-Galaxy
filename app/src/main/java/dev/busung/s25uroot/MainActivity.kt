@@ -145,7 +145,6 @@ class MainActivity : ComponentActivity() {
     private var themeMode by mutableStateOf(AppThemeMode.System)
     private var advancedMode by mutableStateOf(false)
     private var shizukuMode by mutableStateOf(false)
-    private var rootManager by mutableStateOf("KernelSU")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -154,7 +153,6 @@ class MainActivity : ComponentActivity() {
         themeMode = AppPreferences.themeMode(this)
         advancedMode = AppPreferences.advancedMode(this)
         shizukuMode = AppPreferences.shizukuMode(this)
-        rootManager = AppPreferences.rootManager(this)
         setContent {
             RootMyGalaxyTheme(accentColor = accentColor, themeMode = themeMode) {
                 RootApp(
@@ -177,11 +175,6 @@ class MainActivity : ComponentActivity() {
                     },
                     onShizukuModeChanged = { enabled ->
                         AppPreferences.setShizukuMode(this, enabled)
-                    rootManager = rootManager,
-                    onRootManagerChanged = { manager ->
-                        AppPreferences.setRootManager(this@MainActivity, manager)
-                        rootManager = manager
-                    },
                         shizukuMode = enabled
                     },
                     openInstaller = { profileId ->
@@ -269,8 +262,6 @@ private fun RootApp(
     onThemeModeChanged: (AppThemeMode) -> Unit,
     onAdvancedModeChanged: (Boolean) -> Unit,
     onShizukuModeChanged: (Boolean) -> Unit,
-    rootManager: String,
-    onRootManagerChanged: (String) -> Unit,
     openInstaller: (String?) -> Unit,
 ) {
     val installState by installViewModel.state.collectAsStateWithLifecycle()
@@ -439,8 +430,6 @@ private fun RootApp(
                     onThemeModeChanged = onThemeModeChanged,
                     onAdvancedModeChanged = onAdvancedModeChanged,
                     onShizukuModeChanged = onShizukuModeChanged,
-                    rootManager = rootManager,
-                    onRootManagerChanged = onRootManagerChanged,
                 )
             }
         }
@@ -981,8 +970,6 @@ private fun SettingsPage(
     onThemeModeChanged: (AppThemeMode) -> Unit,
     onAdvancedModeChanged: (Boolean) -> Unit,
     onShizukuModeChanged: (Boolean) -> Unit,
-    rootManager: String,
-    onRootManagerChanged: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -990,7 +977,6 @@ private fun SettingsPage(
     var showColorDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showShizukuMissingDialog by remember { mutableStateOf(false) }
-    var showRootManagerDialog by remember { mutableStateOf(false) }
     var languageMenuTop by remember { mutableStateOf(32.dp) }
     var colorMenuTop by remember { mutableStateOf(32.dp) }
     val density = LocalDensity.current
@@ -1053,26 +1039,6 @@ private fun SettingsPage(
 
     if (showAboutDialog) {
         AboutDialog(onDismiss = { showAboutDialog = false })
-    }
-
-    if (showRootManagerDialog) {
-        AlertDialog(
-            onDismissRequest = { showRootManagerDialog = false },
-            title = { Text("Select Root Manager") },
-            text = {
-                Column {
-                    Row(Modifier.fillMaxWidth().clickable { onRootManagerChanged("KernelSU"); showRootManagerDialog = false }.padding(16.dp)) {
-                        RadioButton(selected = rootManager == "KernelSU", onClick = null)
-                        Text("  KernelSU")
-                    }
-                    Row(Modifier.fillMaxWidth().clickable { onRootManagerChanged("SukiSU-Ultra"); showRootManagerDialog = false }.padding(16.dp)) {
-                        RadioButton(selected = rootManager == "SukiSU-Ultra", onClick = null)
-                        Text("  SuKiSU-Ultra")
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showRootManagerDialog = false }) { Text("OK") } }
-        )
     }
 
     LazyColumn(
@@ -1143,17 +1109,6 @@ private fun SettingsPage(
                     },
                 )
             }
-        }
-        item { SectionLabel("Root Manager") }
-        item {
-            SettingsCard(
-                icon = Icons.Rounded.Security,
-                title = "Su Manager",
-                description = "Choose KernelSU or SuKiSU",
-                value = rootManager,
-                position = SettingsCardPosition.GroupedSingle,
-                onClick = { showRootManagerDialog = true },
-            )
         }
         item { SectionLabel(stringResource(R.string.advanced)) }
         item {
