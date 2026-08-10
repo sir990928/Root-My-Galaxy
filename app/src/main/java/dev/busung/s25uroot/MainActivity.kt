@@ -272,6 +272,7 @@ private fun RootApp(
     onShizukuModeChanged: (Boolean) -> Unit,
     onRootManagerChanged: (String) -> Unit,
     openInstaller: (String?) -> Unit,
+    onRootManagerChanged: (String) -> Unit,
 ) {
     val installState by installViewModel.state.collectAsStateWithLifecycle()
     val history by installViewModel.history.collectAsStateWithLifecycle()
