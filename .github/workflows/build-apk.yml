@@ -4,7 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/build-apk.yml"
+      - 'app/**'
+      - 'gradle/**'
+      - '*.gradle'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 env:
@@ -39,7 +44,6 @@ jobs:
       - name: 安装 Android SDK
         uses: android-actions/setup-android@v3
 
-      # 移除NDK、漏洞so编译逻辑，直接根目录打包APK
       - name: 打包Release APK
         run: |
           chmod +x gradlew
@@ -52,4 +56,3 @@ jobs:
           retention-days: 30
           if-no-files-found: error
           path: app/build/outputs/apk/release/*.apk
-

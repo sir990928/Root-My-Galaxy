@@ -74,7 +74,6 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             mutableState.value = InstallUiState(phase = InstallPhase.Checking, probeOutput = mutableState.value.probeOutput)
             startHistory()
             try {
-                // 自动检测无线/本地模式
                 val useWireless = AppPreferences.wirelessAdbMode(app) && try {
                     WirelessAdbManager.ensureConnected(app)
                     appendLog(app.getString(R.string.log_wireless_adb_connected))
@@ -123,7 +122,6 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
 
     private suspend fun executeExploit(payload: File, useWireless: Boolean) {
         if (!useWireless) {
-            // 本地模式
             val logFile = File(app.filesDir, "exploit.log"); logFile.delete()
             val helper = helperFile()
             require(helper.canExecute()) { app.getString(R.string.error_helper_unavailable) }
@@ -157,7 +155,6 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             appendLog(app.getString(R.string.log_bootstrap_root))
             return
         }
-        // 无线模式
         val remotePayload = "$TMP_PATH/${payload.name}"
         val stagedPayload = stageToTmp(payload, payload.name)
         require(stagedPayload.code == 0) { app.getString(R.string.error_wireless_adb_stage, payload.name, stagedPayload.output) }
@@ -230,11 +227,12 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             
             val lateCmd = lateLoadCommand(ksudName, false)
             val insmodCmd = "cat $koPath > /dev/sukisu.ko && logcat insmod /dev/sukisu.ko"
-            if (useWireless) { runRemote(lateCmd); runRemote(insmodCmd) }
-            else { runLocal(lateCmd); runLocal(insmodCmd) }
+            // 已经拿到 root，本地执行更稳定
+            runLocal(lateCmd)
+            runLocal(insmodCmd)
         } else {
             val lateCmd = lateLoadCommand(ksudName, true)
-            if (useWireless) runRemote(lateCmd) else runLocal(lateCmd)
+            runLocal(lateCmd)
         }
         storeInstallReceipt()
         appendLog(app.getString(R.string.log_ksu_control_verified))
@@ -249,8 +247,6 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         val ep = if (ephemeral) " --ephemeral" else ""
         return "ln -sf $TMP_PATH/$ksudName $TMP_PATH/ksud-selected && mount --bind $TMP_PATH/ksud-selected /system/bin/logcat && logcat late-load$ep"
     }
-
-    private fun runRemote(cmd: String) { WirelessAdbManager.runCommand(app, cmd) }
     
     private fun runLocal(cmd: String) {
         val helper = helperFile()
