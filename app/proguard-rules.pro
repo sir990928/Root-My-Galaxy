@@ -15,6 +15,14 @@
 # 协程基础保留
 -keepnames class kotlinx.coroutines.**
 
+# Conscrypt legacy platform adapters (minSdk=33, 永不加载)
+# 它们引用 Android 4.4 前后的 framework 内部 SSL 类，编译期不存在，
+# R8 全程序分析会报 Missing class 并中断 release 构建。
+-dontwarn com.android.org.conscrypt.**
+-dontwarn org.apache.harmony.xnet.provider.jsse.**
+-dontwarn org.conscrypt.KitKatPlatformOpenSSLSocketImplAdapter
+-dontwarn org.conscrypt.PreKitKatPlatformOpenSSLSocketImplAdapter
+
 # 可选：关闭日志（瘦身）
 # -assumenosideeffects class android.util.Log {
 #     public static boolean isLoggable(java.lang.String, int);
