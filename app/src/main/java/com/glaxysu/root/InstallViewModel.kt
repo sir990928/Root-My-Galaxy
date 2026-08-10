@@ -74,10 +74,15 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             mutableState.value = InstallUiState(phase = InstallPhase.Checking, probeOutput = mutableState.value.probeOutput)
             startHistory()
             try {
-                val useWireless = AppPreferences.wirelessAdbMode(app)
-                if (useWireless) {
-                    ensureWirelessAdb()
-                }
+                val useWireless = AppPreferences.wirelessAdbMode(app) && try {
+                WirelessAdbManager.ensureConnected(app)
+                true
+                 } catch (e: Exception) {
+                 false
+}
+if (useWireless) {
+    appendLog(app.getString(R.string.log_wireless_adb_connected))
+}
                 setPhase(InstallPhase.Checking, app.getString(R.string.status_checking_github))
                 val profile = if (profileId == null) repository.resolveTarget(DeviceSnapshot.current()) else repository.resolveTarget(profileId)
                 appendLog(app.getString(R.string.log_profile, profile.profileId))
