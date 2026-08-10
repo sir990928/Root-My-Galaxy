@@ -164,7 +164,7 @@ class MainActivity : ComponentActivity() {
     private var accentColor by mutableStateOf(AccentColor.Dynamic)
     private var themeMode by mutableStateOf(AppThemeMode.System)
     private var advancedMode by mutableStateOf(false)
-    private var shizukuMode by mutableStateOf(false)
+
     private var rootManager by mutableStateOf("KernelSU")
     private var adbConnected by mutableStateOf(false)
 
@@ -175,7 +175,7 @@ class MainActivity : ComponentActivity() {
         accentColor = AppPreferences.accentColor(this)
         themeMode = AppPreferences.themeMode(this)
         advancedMode = AppPreferences.advancedMode(this)
-        shizukuMode = AppPreferences.shizukuMode(this)
+
         rootManager = AppPreferences.rootManager(this)
         adbConnected = AdbController.isConnected()
         setContent {
@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
                     accentColor = accentColor,
                     themeMode = themeMode,
                     advancedMode = advancedMode,
-                    shizukuMode = shizukuMode,
+
                     rootManager = rootManager,
                     adbConnected = adbConnected,
                     onAccentColorChanged = { color ->
@@ -200,10 +200,7 @@ class MainActivity : ComponentActivity() {
                         AppPreferences.setAdvancedMode(this, enabled)
                         advancedMode = enabled
                     },
-                    onShizukuModeChanged = { enabled ->
-                        AppPreferences.setShizukuMode(this, enabled)
-                        shizukuMode = enabled
-                    },
+
                     onRootManagerChanged = { manager ->
                         AppPreferences.setRootManager(this, manager)
                         rootManager = manager
@@ -266,8 +263,7 @@ private val languageOptions = listOf(
         "https://github.com/SukiSU-Ultra/SukiSU-Ultra/releases/latest"
     private const val SUKISU_ULTRA_MANAGER_PACKAGE = "com.sukisu.ultra"
     
-    private const val SHIZUKU_MANAGER_PACKAGE = "moe.shizuku.manager"
-    private const val SHIZUKU_MANAGER_URL = "https://github.com/thedjchi/Shizuku/releases/"
+
 
 private fun isKernelSuManagerInstalled(context: Context): Boolean =
     context.packageManager.getLaunchIntentForPackage(KERNEL_SU_MANAGER_PACKAGE) != null
@@ -285,14 +281,7 @@ private fun isKernelSuManagerInstalled(context: Context): Boolean =
         }
     }
 
-private fun openShizukuManager(context: Context) {
-    val launch = context.packageManager.getLaunchIntentForPackage(SHIZUKU_MANAGER_PACKAGE)
-    if (launch != null) {
-        context.startActivity(launch)
-    } else {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SHIZUKU_MANAGER_URL)))
-    }
-}
+
 
 @Composable
 private fun RootApp(
@@ -300,13 +289,11 @@ private fun RootApp(
     accentColor: AccentColor,
     themeMode: AppThemeMode,
     advancedMode: Boolean,
-    shizukuMode: Boolean,
     rootManager: String,
     adbConnected: Boolean,
     onAccentColorChanged: (AccentColor) -> Unit,
     onThemeModeChanged: (AppThemeMode) -> Unit,
     onAdvancedModeChanged: (Boolean) -> Unit,
-    onShizukuModeChanged: (Boolean) -> Unit,
     onRootManagerChanged: (String) -> Unit,
     onAdbConnectedChanged: (Boolean) -> Unit,
     openInstaller: (String?) -> Unit,
@@ -527,7 +514,7 @@ private fun RootApp(
                     accentColor = accentColor,
                     themeMode = themeMode,
                     advancedMode = advancedMode,
-                    shizukuMode = shizukuMode,
+
                     rootManager = rootManager,
                     adbConnected = adbConnected,
                     updateStatus = updateStatus,
@@ -536,7 +523,6 @@ private fun RootApp(
                     onAccentColorChanged = onAccentColorChanged,
                     onThemeModeChanged = onThemeModeChanged,
                     onAdvancedModeChanged = onAdvancedModeChanged,
-                    onShizukuModeChanged = onShizukuModeChanged,
                     onRootManagerChanged = onRootManagerChanged,
                     onAdbConnectedChanged = onAdbConnectedChanged,
                 )
@@ -1350,17 +1336,7 @@ private fun HistoryResultCard(entry: InstallHistoryEntry) {
                         color = contentColor.copy(alpha = 0.78f),
                     )
                 }
-                Text(
-                    stringResource(
-                        if (entry.usedShizuku) {
-                            R.string.history_shizuku_used
-                        } else {
-                            R.string.history_shizuku_not_used
-                        },
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor.copy(alpha = 0.78f),
-                )
+
             }
         }
     }
@@ -1434,7 +1410,6 @@ private fun SettingsPage(
     accentColor: AccentColor,
     themeMode: AppThemeMode,
     advancedMode: Boolean,
-    shizukuMode: Boolean,
     rootManager: String,
     adbConnected: Boolean,
     updateStatus: UpdateStatus,
@@ -1443,7 +1418,6 @@ private fun SettingsPage(
     onAccentColorChanged: (AccentColor) -> Unit,
     onThemeModeChanged: (AppThemeMode) -> Unit,
     onAdvancedModeChanged: (Boolean) -> Unit,
-    onShizukuModeChanged: (Boolean) -> Unit,
     onRootManagerChanged: (String) -> Unit,
     onAdbConnectedChanged: (Boolean) -> Unit,
 ) {
@@ -1456,40 +1430,12 @@ private fun SettingsPage(
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showColorDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
-    var showShizukuMissingDialog by remember { mutableStateOf(false) }
     var languageMenuTop by remember { mutableStateOf(32.dp) }
     var colorMenuTop by remember { mutableStateOf(32.dp) }
     val density = LocalDensity.current
     val currentLanguageTag = AppPreferences.languageTag(context)
 
-    if (showShizukuMissingDialog) {
-        AlertDialog(
-            onDismissRequest = { showShizukuMissingDialog = false },
-            icon = { Icon(Icons.Rounded.Info, contentDescription = null) },
-            title = {
-                DialogDimAmount(0.34f)
-                Text(stringResource(R.string.shizuku_not_running_title))
-            },
-            text = { Text(stringResource(R.string.shizuku_not_running_body)) },
-            confirmButton = {
-                FilledTonalButton(onClick = {
-                    clickHaptic(view)
-                    showShizukuMissingDialog = false
-                    openShizukuManager(context)
-                }) {
-                    Text(stringResource(R.string.action_download_shizuku))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    clickHaptic(view)
-                    showShizukuMissingDialog = false
-                }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
-    }
+
 
     if (showLanguageDialog) {
         SideChoiceMenu(
@@ -1565,30 +1511,10 @@ private fun SettingsPage(
                     title = stringResource(R.string.language),
                     description = stringResource(R.string.language_description),
                     value = languageLabel(currentLanguageTag),
-                    position = SettingsCardPosition.Middle,
+                    position = SettingsCardPosition.Bottom,
                     onClick = {
                         clickHaptic(view)
                         showLanguageDialog = true
-                    },
-                )
-                SettingsSwitchCard(
-                    icon = Icons.Rounded.VerifiedUser,
-                    title = stringResource(R.string.shizuku_mode),
-                    description = stringResource(R.string.shizuku_mode_description),
-                    checked = shizukuMode,
-                    position = SettingsCardPosition.Bottom,
-                    onCheckedChange = { enabled ->
-                        clickHaptic(view)
-                        if (!enabled) {
-                            onShizukuModeChanged(false)
-                        } else {
-                            scope.launch {
-                                    }
-                                } else {
-                                    showShizukuMissingDialog = true
-                                }
-                            }
-                        }
                     },
                 )
             }
@@ -1709,7 +1635,7 @@ private fun SettingsPage(
             confirmButton = {
                 Button(onClick = {
                     scope.launch {
-                        val success = AdbController.connect(port = port.toIntOrNull() ?: 5555)
+                        val success = AdbController.enableWifiDebug(port = port.toIntOrNull() ?: 5555)
                         onAdbConnectedChanged(success)
                         showAdbPairingDialog = false
                     }

@@ -33,7 +33,7 @@ object AppPreferences {
     private const val ACCENT_COLOR = "accent_color"
     private const val THEME_MODE = "theme_mode"
     private const val ADVANCED_MODE = "advanced_mode"
-    private const val SHIZUKU_MODE = "shizuku_mode"
+
     private const val ROOT_MANAGER = "root_manager"
     private const val ADB_PORT = "adb_port"
     private const val ADB_PAIRING_CODE = "adb_pairing_code"
@@ -68,14 +68,7 @@ object AppPreferences {
             .apply()
     }
 
-    fun shizukuMode(context: Context): Boolean =
-        prefs(context).getBoolean(SHIZUKU_MODE, false)
 
-    fun setShizukuMode(context: Context, enabled: Boolean) {
-        prefs(context).edit()
-            .putBoolean(SHIZUKU_MODE, enabled)
-            .apply()
-    }
 
     fun rootManager(context: Context): String =
         prefs(context).getString(ROOT_MANAGER, "KernelSU") ?: "KernelSU"
