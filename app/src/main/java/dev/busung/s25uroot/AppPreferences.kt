@@ -33,6 +33,8 @@ object AppPreferences {
     private const val ACCENT_COLOR = "accent_color"
     private const val THEME_MODE = "theme_mode"
     private const val ADVANCED_MODE = "advanced_mode"
+    private const val SHIZUKU_MODE = "shizuku_mode"
+    private const val ROOT_MANAGER = "root_manager"
     private const val CONSUMED_INSTALL_REQUEST = "consumed_install_request"
 
     fun accentColor(context: Context): AccentColor = AccentColor.fromStoredValue(
@@ -69,6 +71,27 @@ object AppPreferences {
             .putBoolean(ADVANCED_MODE, enabled)
             .apply()
     }
+
+    fun shizukuMode(context: Context): Boolean =
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .getBoolean(SHIZUKU_MODE, false)
+
+    fun setShizukuMode(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(SHIZUKU_MODE, enabled)
+            .apply()
+    }
+    
+    
+fun rootManager(context: Context): String =
+    context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        .getString(ROOT_MANAGER, "KernelSU") ?: "KernelSU"
+
+fun setRootManager(context: Context, manager: String) {
+    context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        .edit().putString(ROOT_MANAGER, manager).apply()
+}
 
     @Synchronized
     fun consumeInstallRequest(context: Context, requestId: String?): Boolean {

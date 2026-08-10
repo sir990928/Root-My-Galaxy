@@ -18,14 +18,9 @@ data class VerifiedPayloads(
 class PayloadRepository(private val context: Context) {
     fun loadTargets(): List<TargetProfile> {
         val commit = resolveMainCommit()
-        val manifestBytes = downloadBytes(rawUrl(commit, "support/targets-v3.json"), MAX_MANIFEST_BYTES)
+        val manifestBytes = downloadBytes(rawUrl(commit, "Root-My-Galaxy-Payloads/support/targets-v3.json"), MAX_MANIFEST_BYTES)
         return SupportManifest.parse(manifestBytes).targets.map { profile -> profile.copy(
             exploit = profile.exploit.copy(url = pinArtifactUrl(profile.exploit.url, commit)),
-            kernelSu = profile.kernelSu.copy(
-                artifact = profile.kernelSu.artifact.copy(
-                    url = pinArtifactUrl(profile.kernelSu.artifact.url, commit),
-                ),
-            ),
         ) }
     }
 
@@ -39,18 +34,47 @@ class PayloadRepository(private val context: Context) {
 
     fun download(profile: TargetProfile, onProgress: (String) -> Unit): VerifiedPayloads {
         val directory = File(context.filesDir, "payloads/${profile.profileId}").apply { mkdirs() }
+        
+        // 1. 下载 exploit
         val exploit = downloadArtifact(
             profile.exploit,
             File(directory, "cve-2026-43499-app.so"),
             context.getString(R.string.artifact_exploit),
             onProgress,
         )
+        
+        // 2. 根据选择下载对应 ksud + .ko
+        val mgr = AppPreferences.rootManager(context)
+        val isSukisu = mgr == "SukiSU-Ultra"
+        val key = if (isSukisu) "sukisu" else "kernelsu"
+        val m = profile.managers[key]
+        val ksudUrl = m?.ksudUrl ?: ""
+        val ksudName = if (isSukisu) "sukisu-ksud" else "kernelsu-ksud"
+        
         val kernelSu = downloadArtifact(
-            profile.kernelSu.artifact,
-            File(directory, "ksud-s25u-kdp"),
+            RemoteArtifact(ksudUrl, -1),
+            File(directory, ksudName),
             context.getString(R.string.artifact_kernelsu),
             onProgress,
         )
+        
+        // 3. SuKiSU 需要额外下载 .ko
+        if (isSukisu && m?.koUrl != null) {
+            onProgress(context.getString(R.string.repo_downloading, "kernel module"))
+            val koFile = File(directory, "sukisu.ko")
+            try {
+                val conn = URL(m.koUrl).openConnection() as HttpURLConnection
+                conn.connectTimeout = 15_000; conn.readTimeout = 120_000; conn.connect()
+                require(conn.responseCode == 200) { "HTTP ${conn.responseCode}" }
+                conn.inputStream.use { input -> koFile.outputStream().use { output -> input.copyTo(output) } }
+                conn.disconnect()
+                Os.chmod(koFile.absolutePath, 0b100100100)
+                onProgress(context.getString(R.string.repo_verified, "kernel module"))
+            } catch (e: Exception) {
+                onProgress("KO failed: ${e.message}")
+            }
+        }
+        
         Os.chmod(exploit.absolutePath, 0b100100100)
         Os.chmod(kernelSu.absolutePath, 0b100100100)
         return VerifiedPayloads(profile, exploit, kernelSu)
@@ -96,9 +120,8 @@ class PayloadRepository(private val context: Context) {
 
     private fun resolveMainCommit(): String {
         val response = downloadBytes(COMMIT_API_URL, MAX_COMMIT_RESPONSE_BYTES)
-        val commit = JSONObject(response.toString(Charsets.UTF_8))
-            .getJSONObject("object")
-            .getString("sha")
+        val json = JSONObject(response.toString(Charsets.UTF_8))
+        val commit = json.getString("sha")
         require(commit.matches(Regex("[0-9a-f]{40}"))) { context.getString(R.string.repo_commit_invalid) }
         return commit
     }
@@ -141,11 +164,11 @@ class PayloadRepository(private val context: Context) {
 
     companion object {
         private const val COMMIT_API_URL =
-            "https://gitee.com/api/v5/repos/lin0928/samsung-root/commits/main""
+            "https://gitee.com/api/v5/repos/lin0928/samsung-root/commits/main"
         private const val RAW_REPOSITORY =
             "https://gitee.com/lin0928/samsung-root/raw"
         private const val MUTABLE_RAW_PREFIX = "$RAW_REPOSITORY/main/"
         private const val MAX_COMMIT_RESPONSE_BYTES = 16 * 1024
-        private const val MAX_MANIFEST_BYTES = 256 * 1024
+        private const val MAX_MANIFEST_BYTES = 1024 * 1024
     }
 }
