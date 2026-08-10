@@ -3,9 +3,14 @@ package dev.busung.s25uroot
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class RemoteArtifact(
-    val url: String,
-    val size: Long,
+data class RemoteArtifact(val url: String, val size: Long = -1)
+
+data class ManagerInfo(
+    val name: String,
+    val ksudUrl: String,
+    val koUrl: String? = null,
+    val needsKo: Boolean = false,
+    val managerPackage: String,
 )
 
 data class TargetProfile(
@@ -14,67 +19,50 @@ data class TargetProfile(
     val models: Set<String>,
     val kernelVersions: Set<String>,
     val exploit: RemoteArtifact,
-    val kernelSu: RemoteArtifact,
+    val managers: Map<String, ManagerInfo>,
 ) {
-    init {
-        require(models.isNotEmpty()) { "Payload must support at least one model" }
-        require(kernelVersions.isNotEmpty()) { "Payload must support at least one kernel version" }
-    }
-
-    fun matchesDevice(snapshot: DeviceSnapshot): Boolean =
-        models.any { it.equals(snapshot.model, ignoreCase = true) }
-
-    fun matchesKernelVersion(snapshot: DeviceSnapshot): Boolean =
-        snapshot.kernelVersion in kernelVersions
-
     fun matches(snapshot: DeviceSnapshot): Boolean =
-        matchesDevice(snapshot) && matchesKernelVersion(snapshot)
-
-    val supportedModels: String
-        get() = models.joinToString()
-
-    val supportedKernelVersions: String
-        get() = kernelVersions.joinToString()
+        models.any { it.equals(snapshot.model, ignoreCase = true) } &&
+        snapshot.kernelVersion in kernelVersions
 }
 
-data class SupportManifest(
-    val schemaVersion: Int,
-    val targets: List<TargetProfile>,
-) {
+data class SupportManifest(val targets: List<TargetProfile>) {
     companion object {
         fun parse(bytes: ByteArray): SupportManifest {
             val root = JSONObject(bytes.toString(Charsets.UTF_8))
-            val schemaVersion = root.getInt("schemaVersion")
-            require(schemaVersion == 3) { "Unsupported support manifest schema" }
-            val payloadsJson = root.getJSONArray("payloads")
-            val payloads = buildList {
-                for (index in 0 until payloadsJson.length()) {
-                    val payload = payloadsJson.getJSONObject(index)
-                    val exploit = payload.getJSONObject("exploit")
-                    val kernelSu = payload.getJSONObject("kernelsu")
-                    add(
-                        TargetProfile(
-                            profileId = payload.getString("payloadId"),
-                            displayName = payload.getString("displayName"),
-                            models = payload.getJSONArray("models").strings(),
-                            kernelVersions = payload.getJSONArray("kernelVersions").strings(),
-                            exploit = RemoteArtifact(
-                                url = exploit.getString("url"),
-                                size = exploit.getLong("size"),
-                            ),
-                            kernelSu = RemoteArtifact(
-                                url = kernelSu.getString("url"),
-                                size = kernelSu.getLong("size"),
-                            ),
-                        ),
-                    )
+            val payloads = root.getJSONArray("payloads")
+            val list = buildList {
+                for (i in 0 until payloads.length()) {
+                    val p = payloads.getJSONObject(i)
+                    val exploit = p.getJSONObject("exploit")
+                    val mgrJson = p.getJSONObject("managers")
+                    val mgrMap = buildMap {
+                        for (key in mgrJson.keys()) {
+                            val m = mgrJson.getJSONObject(key)
+                            put(key, ManagerInfo(
+                                name = m.getString("name"),
+                                ksudUrl = m.getString("ksudUrl"),
+                                koUrl = m.optString("koUrl", null),
+                                needsKo = m.optBoolean("needsKo", false),
+                                managerPackage = m.getString("managerPackage"),
+                            ))
+                        }
+                    }
+                    add(TargetProfile(
+                        profileId = p.getString("payloadId"),
+                        displayName = p.getString("displayName"),
+                        models = p.getJSONArray("models").strings(),
+                        kernelVersions = p.getJSONArray("kernelVersions").strings(),
+                        exploit = RemoteArtifact(exploit.getString("url")),
+                        managers = mgrMap,
+                    ))
                 }
             }
-            return SupportManifest(schemaVersion, payloads)
+            return SupportManifest(list)
         }
 
         private fun JSONArray.strings(): Set<String> = buildSet {
-            for (index in 0 until length()) add(getString(index))
+            for (i in 0 until length()) add(getString(i))
         }
     }
 }
