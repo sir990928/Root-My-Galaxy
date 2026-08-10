@@ -33,73 +33,52 @@ object AppPreferences {
     private const val ACCENT_COLOR = "accent_color"
     private const val THEME_MODE = "theme_mode"
     private const val ADVANCED_MODE = "advanced_mode"
-
-    private const val ROOT_MANAGER = "root_manager"
-    private const val ADB_PORT = "adb_port"
-    private const val ADB_PAIRING_CODE = "adb_pairing_code"
     private const val CONSUMED_INSTALL_REQUEST = "consumed_install_request"
 
     fun accentColor(context: Context): AccentColor = AccentColor.fromStoredValue(
-        prefs(context).getString(ACCENT_COLOR, null),
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .getString(ACCENT_COLOR, null),
     )
 
     fun setAccentColor(context: Context, color: AccentColor) {
-        prefs(context).edit()
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
             .putString(ACCENT_COLOR, color.storedValue)
             .apply()
     }
 
     fun themeMode(context: Context): AppThemeMode = AppThemeMode.fromStoredValue(
-        prefs(context).getString(THEME_MODE, null),
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .getString(THEME_MODE, null),
     )
 
     fun setThemeMode(context: Context, themeMode: AppThemeMode) {
-        prefs(context).edit()
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
             .putString(THEME_MODE, themeMode.storedValue)
             .apply()
     }
 
     fun advancedMode(context: Context): Boolean =
-        prefs(context).getBoolean(ADVANCED_MODE, false)
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .getBoolean(ADVANCED_MODE, false)
 
     fun setAdvancedMode(context: Context, enabled: Boolean) {
-        prefs(context).edit()
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
             .putBoolean(ADVANCED_MODE, enabled)
-            .apply()
-    }
-
-
-
-    fun rootManager(context: Context): String =
-        prefs(context).getString(ROOT_MANAGER, "KernelSU") ?: "KernelSU"
-
-    fun setRootManager(context: Context, manager: String) {
-        prefs(context).edit()
-            .putString(ROOT_MANAGER, manager)
-            .apply()
-    }
-
-    fun adbPort(context: Context): Int =
-        prefs(context).getInt(ADB_PORT, 5555)
-
-    fun setAdbPort(context: Context, port: Int) {
-        prefs(context).edit()
-            .putInt(ADB_PORT, port)
             .apply()
     }
 
     @Synchronized
     fun consumeInstallRequest(context: Context, requestId: String?): Boolean {
         if (requestId.isNullOrBlank()) return false
-        val preferences = prefs(context)
+        val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         if (preferences.getString(CONSUMED_INSTALL_REQUEST, null) == requestId) return false
         return preferences.edit()
             .putString(CONSUMED_INSTALL_REQUEST, requestId)
             .commit()
     }
-
-    private fun prefs(context: Context) =
-        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
 
     fun languageTag(context: Context): String {
         val locales = context.getSystemService(LocaleManager::class.java).applicationLocales

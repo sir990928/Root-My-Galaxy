@@ -6,8 +6,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Typography
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
@@ -58,22 +56,18 @@ fun RootMyGalaxyTheme(
         AppThemeMode.Light -> false
         AppThemeMode.Dark -> true
     }
-    val colors = if (accentColor == AccentColor.Dynamic) {
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val generatedColors = rememberDynamicColorScheme(
+        seedColor = accentSeed(context, accentColor),
+        isDark = darkTheme,
+        style = PaletteStyle.TonalSpot,
+        specVersion = ColorSpec.SpecVersion.SPEC_2025,
+    )
+    val colors = if (darkTheme) {
+        generatedColors
     } else {
-        val generatedColors = rememberDynamicColorScheme(
-            seedColor = accentSeed(context, accentColor),
-            isDark = darkTheme,
-            style = PaletteStyle.TonalSpot,
-            specVersion = ColorSpec.SpecVersion.SPEC_2025,
+        generatedColors.copy(
+            onSurfaceVariant = lerp(generatedColors.surface, generatedColors.onSurface, 0.8f),
         )
-        if (darkTheme) {
-            generatedColors
-        } else {
-            generatedColors.copy(
-                onSurfaceVariant = lerp(generatedColors.surface, generatedColors.onSurface, 0.8f),
-            )
-        }
     }
 
     SideEffect {
