@@ -1,0 +1,55 @@
+name: 仅构建 S9380ZHU1AYA1 APK（不编译漏洞so）
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-apk.yml"
+  workflow_dispatch:
+
+env:
+  TARGET: pa3q-S9380ZHU1AYA1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 配置 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: gradle
+
+      - name: 安装基础工具
+        run: sudo apt update && sudo apt install -y zip unzip wget
+
+      - name: 清理预装安卓SDK
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo mkdir -p /usr/local/lib/android/sdk
+          sudo chown -R $USER:$USER /usr/local/lib/android
+
+      - name: 安装 Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 移除NDK、漏洞so编译逻辑，直接根目录打包APK
+      - name: 打包Release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: 上传成品APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-${{ env.TARGET }}
+          retention-days: 30
+          if-no-files-found: error
+          path: app/build/outputs/apk/release/*.apk
+
