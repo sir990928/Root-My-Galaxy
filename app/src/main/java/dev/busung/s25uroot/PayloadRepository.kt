@@ -55,7 +55,7 @@ class PayloadRepository(private val context: Context) {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 15_000; conn.readTimeout = 120_000; conn.connect()
         require(conn.responseCode == 200) { "HTTP ${conn.responseCode}" }
-        conn.inputStream.use { FileOutputStream(tmp).use { it.copyTo(it) } }
+        conn.inputStream.use { FileOutputStream(tmp).use { it.copyTo(it, 8192) } }
         conn.disconnect()
         tmp.renameTo(dest)
         onProgress("$label downloaded (${dest.length()} bytes)")

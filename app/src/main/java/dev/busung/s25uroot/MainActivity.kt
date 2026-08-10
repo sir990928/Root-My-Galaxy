@@ -1583,11 +1583,6 @@ private fun SettingsPage(
                             onShizukuModeChanged(false)
                         } else {
                             scope.launch {
-                                false()
-                                if (false()) {
-                                    onShizukuModeChanged(true)
-                                    if (!false()) {
-                                        false()
                                     }
                                 } else {
                                     showShizukuMissingDialog = true
