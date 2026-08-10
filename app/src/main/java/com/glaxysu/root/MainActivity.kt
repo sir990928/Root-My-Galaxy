@@ -1234,6 +1234,7 @@ private fun SettingsPage(
                             }
                         }
                         wirelessConnected = connected
+                        AppPreferences.setWirelessAdbMode(context, connected)
                         wirelessPaired = AppPreferences.wirelessAdbPaired(context)
                         if (!connected) {
                             if (paired) {
