@@ -229,44 +229,76 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             }
             appendLog("[+] SukiSU module staged: $koPath")
             
-            // exp 过后统一用本地 runLocal
-            // 1. late-load + mount bind
-            val lateResult = runLocal(lateLoadCommand(ksudName, false))
-            require(lateResult.code == 0) { "late-load failed: ${lateResult.output}" }
-            appendLog("[+] late-load completed")
-            
-            // 验证 mount bind
-            val mountCheck = runLocal("mount | grep /system/bin/logcat")
-            require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
-                "Mount bind failed! logcat not replaced. Output: ${mountCheck.output}"
+            // exp 过后：无线模式用 ADB 执行被授权的 helper，本地模式用本地 helper
+            if (useWireless) {
+                // 1. late-load + mount bind
+                val lateResult = runHelper("-c", lateLoadCommand(ksudName, false))
+                require(lateResult.code == 0) { "late-load failed: ${lateResult.output}" }
+                appendLog("[+] late-load completed")
+                
+                // 验证 mount bind
+                val mountCheck = runHelper("-c", "mount | grep /system/bin/logcat")
+                require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
+                    "Mount bind failed! logcat not replaced. Output: ${mountCheck.output}"
+                }
+                appendLog("[+] mount bind verified")
+                
+                // 2. 复制 .ko 到 /dev
+                val catResult = runHelper("-c", "cat ${shellQuote(koPath)} > /dev/sukisu.ko")
+                require(catResult.code == 0) { "Failed to write ko: ${catResult.output}" }
+                appendLog("[+] ko written to /dev/sukisu.ko")
+                
+                // 3. insmod 加载
+                val insmodResult = runHelper("-c", "logcat insmod /dev/sukisu.ko")
+                require(insmodResult.code == 0) { "insmod failed: ${insmodResult.output}" }
+                
+                // 验证模块加载
+                val moduleCheck = runHelper("-c", "cat /proc/modules | grep sukisu")
+                require(moduleCheck.code == 0 && moduleCheck.output.contains("sukisu")) {
+                    "Module not loaded in kernel! ${moduleCheck.output}"
+                }
+                appendLog("[+] SukiSU loaded and verified in kernel")
+            } else {
+                // 本地模式
+                val lateResult = runLocal(lateLoadCommand(ksudName, false))
+                require(lateResult.code == 0) { "late-load failed: ${lateResult.output}" }
+                
+                val mountCheck = runLocal("mount | grep /system/bin/logcat")
+                require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
+                    "Mount bind failed! Output: ${mountCheck.output}"
+                }
+                
+                val catResult = runLocal("cat ${shellQuote(koPath)} > /dev/sukisu.ko")
+                require(catResult.code == 0) { "Failed to write ko: ${catResult.output}" }
+                
+                val insmodResult = runLocal("logcat insmod /dev/sukisu.ko")
+                require(insmodResult.code == 0) { "insmod failed: ${insmodResult.output}" }
+                
+                val moduleCheck = runLocal("cat /proc/modules | grep sukisu")
+                require(moduleCheck.code == 0 && moduleCheck.output.contains("sukisu")) {
+                    "Module not loaded in kernel! ${moduleCheck.output}"
+                }
+                appendLog("[+] SukiSU loaded and verified in kernel")
             }
-            appendLog("[+] mount bind verified")
-            
-            // 2. 复制 .ko 到 /dev
-            val catResult = runLocal("cat ${shellQuote(koPath)} > /dev/sukisu.ko")
-            require(catResult.code == 0) { "Failed to write ko: ${catResult.output}" }
-            appendLog("[+] ko written to /dev/sukisu.ko")
-            
-            // 3. insmod 加载
-            val insmodResult = runLocal("logcat insmod /dev/sukisu.ko")
-            require(insmodResult.code == 0) { "insmod failed: ${insmodResult.output}" }
-            
-            // 验证模块加载
-            val moduleCheck = runLocal("cat /proc/modules | grep sukisu")
-            require(moduleCheck.code == 0 && moduleCheck.output.contains("sukisu")) {
-                "Module not loaded in kernel! ${moduleCheck.output}"
-            }
-            appendLog("[+] SukiSU loaded and verified in kernel")
             
         } else {
             // 普通 KernelSU
-            val result = runLocal(lateLoadCommand(ksudName, true))
-            require(result.code == 0) { "late-load failed: ${result.output}" }
-            
-            // 验证 mount bind
-            val mountCheck = runLocal("mount | grep /system/bin/logcat")
-            require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
-                "Mount bind failed! Output: ${mountCheck.output}"
+            if (useWireless) {
+                val result = runHelper("-c", lateLoadCommand(ksudName, true))
+                require(result.code == 0) { "late-load failed: ${result.output}" }
+                
+                val mountCheck = runHelper("-c", "mount | grep /system/bin/logcat")
+                require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
+                    "Mount bind failed! Output: ${mountCheck.output}"
+                }
+            } else {
+                val result = runLocal(lateLoadCommand(ksudName, true))
+                require(result.code == 0) { "late-load failed: ${result.output}" }
+                
+                val mountCheck = runLocal("mount | grep /system/bin/logcat")
+                require(mountCheck.code == 0 && mountCheck.output.contains("/system/bin/logcat")) {
+                    "Mount bind failed! Output: ${mountCheck.output}"
+                }
             }
             appendLog("[+] KernelSU late-load completed")
         }
@@ -285,6 +317,20 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         return "ln -sf $TMP_PATH/$ksudName $TMP_PATH/ksud-selected && mount --bind $TMP_PATH/ksud-selected /system/bin/logcat && logcat late-load$ep"
     }
     
+    // 无线模式：通过 ADB 执行被 exp 授权的远程 helper
+    private fun runHelper(vararg arguments: String): CommandResult {
+        val command = buildString {
+            append(shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH))
+            arguments.forEach {
+                append(' ')
+                append(shellQuote(it))
+            }
+        }
+        val result = WirelessAdbManager.runCommand(app, command)
+        return CommandResult(result.code, stripAnsi(result.output.trim()))
+    }
+    
+    // 本地模式：执行本地 helper
     private fun runLocal(cmd: String): CommandResult {
         val helper = helperFile()
         val process = ProcessBuilder(helper.absolutePath, "-c", cmd)
