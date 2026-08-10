@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Galaxy Root</string>
+    <string name="app_name">Root my Galaxy</string>
     <string name="nav_overview">Início</string>
     <string name="nav_history">Histórico</string>
     <string name="nav_settings">Configurações</string>
@@ -110,7 +110,7 @@
     <string name="repo_url_invalid">O repositório de artefatos não é permitido</string>
     <string name="repo_response_too_large">A resposta excedeu seu limite de tamanho</string>
     <string name="open_github">Abrir GitHub</string>
-    <string name="github_card_title">Explorar o Galaxy Root</string>
+    <string name="github_card_title">Explorar o Root My Galaxy</string>
     <string name="github_card_description">Ver o código-fonte e instruções de uso.</string>
     <string name="action_continue">Continuar mesmo assim</string>
     <string name="action_next">Próximo</string>
