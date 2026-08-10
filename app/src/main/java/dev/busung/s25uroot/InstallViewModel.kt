@@ -64,7 +64,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             mutableTargetCatalog.value = TargetCatalogUiState(loading = true)
             mutableTargetCatalog.value = try {
-                TargetCatalogUiState(profiles = repository.loadTargets().sortedWith(compareBy(TargetProfile::displayName, TargetProfile::profileId)))
+                TargetCatalogUiState(profiles = repository.loadTargetCatalog().sortedWith(compareBy(TargetProfile::displayName, TargetProfile::profileId)))
             } catch (error: Throwable) {
                 TargetCatalogUiState(error = error.message)
             }

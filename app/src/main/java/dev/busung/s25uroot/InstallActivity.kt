@@ -383,7 +383,6 @@ private fun installPhaseDetail(phase: InstallPhase): String = stringResource(
         InstallPhase.Downloading -> R.string.phase_downloading
         InstallPhase.Exploiting -> R.string.phase_exploiting
         InstallPhase.LoadingKernelSu -> R.string.phase_loading_ksu
-        InstallPhase.AdbPairing -> "Wireless ADB Pairing Required"
         InstallPhase.Installed -> R.string.phase_installed
         InstallPhase.Failed -> R.string.phase_failed
     },
@@ -395,7 +394,6 @@ private fun installProgress(phase: InstallPhase): Float = when (phase) {
     InstallPhase.Downloading -> 0.3f
     InstallPhase.Exploiting -> 0.6f
     InstallPhase.LoadingKernelSu -> 0.85f
-    InstallPhase.AdbPairing -> 0.2f
     InstallPhase.Installed -> 1f
     InstallPhase.Failed -> 0f
 }
@@ -407,7 +405,6 @@ private fun stepState(phase: InstallPhase, stepIndex: Int): Int {
         InstallPhase.Downloading -> 1
         InstallPhase.Exploiting -> 2
         InstallPhase.LoadingKernelSu -> 3
-        InstallPhase.AdbPairing -> 0
         InstallPhase.Installed -> 4
     }
     return when {

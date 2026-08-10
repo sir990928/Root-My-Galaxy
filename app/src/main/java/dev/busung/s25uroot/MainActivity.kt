@@ -1583,11 +1583,11 @@ private fun SettingsPage(
                             onShizukuModeChanged(false)
                         } else {
                             scope.launch {
-                                ShizukuController.pingUntilRunning()
-                                if (ShizukuController.isRunning()) {
+                                false()
+                                if (false()) {
                                     onShizukuModeChanged(true)
-                                    if (!ShizukuController.isGranted()) {
-                                        ShizukuController.requestPermission()
+                                    if (!false()) {
+                                        false()
                                     }
                                 } else {
                                     showShizukuMissingDialog = true
