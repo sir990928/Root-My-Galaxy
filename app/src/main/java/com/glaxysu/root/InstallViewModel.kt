@@ -225,14 +225,15 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             }
             appendLog("[+] SukiSU module staged: $koPath")
             
-            val lateCmd = lateLoadCommand(ksudName, false)
-            val insmodCmd = "cat $koPath > /dev/sukisu.ko && logcat insmod /dev/sukisu.ko"
-            // 已经拿到 root，本地执行更稳定
-            runLocal(lateCmd)
-            runLocal(insmodCmd)
+            // 1. late-load
+            runLocal(lateLoadCommand(ksudName, false))
+            // 2. 复制 .ko 到 /dev
+            runLocal("cat ${shellQuote(koPath)} > /dev/sukisu.ko")
+            // 3. insmod 加载
+            runLocal("logcat insmod /dev/sukisu.ko")
+            appendLog("[+] SukiSU loaded")
         } else {
-            val lateCmd = lateLoadCommand(ksudName, true)
-            runLocal(lateCmd)
+            runLocal(lateLoadCommand(ksudName, true))
         }
         storeInstallReceipt()
         appendLog(app.getString(R.string.log_ksu_control_verified))
