@@ -34,7 +34,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // CI通过全局环境变量自动签名，无需本地signingConfigs声明
             signingConfig = null
         }
     }
@@ -62,7 +61,6 @@ android {
 
     packaging {
         jniLibs.useLegacyPackaging = true
-        jniLibs.keepDebugSymbols = false
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
 }
