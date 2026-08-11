@@ -162,26 +162,6 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     }
 }
 
-        repeat(WIRELESS_CONNECT_ATTEMPTS) { attempt ->
-            wirelessExecution = WirelessAdbManager.refreshConnection(
-                app,
-                forceReconnect = attempt == 0,
-                allowUnpaired = wirelessExpected,
-            )
-            if (wirelessExecution) {
-                appendLog(app.getString(R.string.log_wireless_adb_connected))
-                appendLog(app.getString(R.string.log_execution_mode_wireless))
-                return
-            }
-            if (attempt + 1 < WIRELESS_CONNECT_ATTEMPTS) {
-                delay(WIRELESS_CONNECT_RETRY_DELAY_MILLIS)
-            }
-        }
-
-        wirelessExecution = false
-        appendLog(app.getString(R.string.log_execution_mode_local_wireless_unavailable))
-    }
-
     private fun isWirelessDebuggingEnabled(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
         return runCatching {
@@ -190,19 +170,19 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun stageBootstrapHelper() {
-    val helper = helperFile()
-    require(helper.isFile && helper.canRead() && (wirelessExecution || helper.canExecute())) {
-        app.getString(R.string.error_helper_unavailable)
+        val helper = helperFile()
+        require(helper.isFile && helper.canRead() && (wirelessExecution || helper.canExecute())) {
+            app.getString(R.string.error_helper_unavailable)
+        }
+        if (!wirelessExecution) return
+        val result = WirelessAdbManager.stageFile(app, helper, WirelessAdbManager.REMOTE_HELPER_PATH)
+        require(result.code == 0) {
+            app.getString(R.string.error_wireless_adb_stage, helper.name, result.output)
+        }
+        appendLog(app.getString(R.string.log_wireless_adb_helper_staged))
     }
-    if (!wirelessExecution) return
-    val result = WirelessAdbManager.stageFile(app, helper, WirelessAdbManager.REMOTE_HELPER_PATH)
-    require(result.code == 0) {
-        app.getString(R.string.error_wireless_adb_stage, helper.name, result.output)
-    }
-    appendLog(app.getString(R.string.log_wireless_adb_helper_staged))
-}
+
     private suspend fun executeExploit(payload: File) {
-    // ✅ 实时跟开关走
     if (isWirelessDebuggingEnabled() || AppPreferences.wirelessAdbPaired(app)) {
         try {
             WirelessAdbManager.ensureConnected(app)
@@ -220,23 +200,24 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     }
 
     appendLog(app.getString(R.string.log_execution_path_wireless))
-    val remotePayload = "$TMP_PATH/${payload.name}"
-    val stagedPayload = stageToTmp(payload, payload.name)
-    require(stagedPayload.code == 0) {
-        app.getString(R.string.error_wireless_adb_stage, payload.name, stagedPayload.output)
-    }
+        val remotePayload = "$TMP_PATH/${payload.name}"
+        val stagedPayload = stageToTmp(payload, payload.name)
+        require(stagedPayload.code == 0) {
+            app.getString(R.string.error_wireless_adb_stage, payload.name, stagedPayload.output)
+        }
 
-    val logPrefix = mutableState.value.log
-    val exploitCommand = buildString {
-        append("cd ${shellQuote(TMP_PATH)} && ")
-        append("EXPLOIT_ATTEMPTS=${shellQuote(EXPLOIT_ATTEMPTS)} ")
-        append("PSELECT_DELAY_USEC=1000 ")
-        append("P0_ATTEMPT_TIMEOUT_SEC=45 ")
-        append("EXPLOIT_ATTEMPT_TIMEOUT_SEC=120 ")
-        append("CVE43499_ROOT_HELPER=${shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH)} ")
-        append("LD_PRELOAD=${shellQuote(remotePayload)} ")
-        append("/system/bin/true")
-    }
+        val logPrefix = mutableState.value.log
+        val exploitCommand = buildString {
+            append("cd ${shellQuote(TMP_PATH)} && ")
+            append("EXPLOIT_ATTEMPTS=${shellQuote(EXPLOIT_ATTEMPTS)} ")
+            append("PSELECT_DELAY_USEC=1000 ")
+            append("P0_ATTEMPT_TIMEOUT_SEC=45 ")
+            append("EXPLOIT_ATTEMPT_TIMEOUT_SEC=120 ")
+            append("CVE43499_ROOT_HELPER=${shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH)} ")
+            append("LD_PRELOAD=${shellQuote(remotePayload)} ")
+            append("/system/bin/true")
+        }
+
         val process = WirelessAdbManager.openProcess(app, exploitCommand)
         val startedAt = SystemClock.elapsedRealtime()
         var lastProgressAt = startedAt
@@ -584,53 +565,37 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     private fun helperFile(): File = nativeHelperFile()
     private fun nativeHelperFile() = File(app.applicationInfo.nativeLibraryDir, "libcve43499root.so")
     private fun runHelper(vararg arguments: String): CommandResult {
-    // ✅ 每次执行都看开关
-    val wirelessExpected = isWirelessDebuggingEnabled() || AppPreferences.wirelessAdbPaired(app)
-    
-    val actuallyWireless = if (wirelessExpected) {
-        try {
-            WirelessAdbManager.refreshConnection(app, forceReconnect = false)
-        } catch (e: Exception) {
-            false
+        if (!wirelessExecution) {
+            val helper = helperFile()
+            require(helper.isFile && helper.canExecute()) {
+                app.getString(R.string.error_helper_unavailable)
+            }
+            val process = ProcessBuilder(listOf(helper.absolutePath) + arguments)
+                .redirectErrorStream(true)
+                .start()
+            val output = readProcessOutput(process)
+            return CommandResult(process.waitFor(), stripAnsi(output.trim()))
         }
-    } else {
-        false
-    }
-    
-    // ✅ 根据开关实时同步状态
-    wirelessExecution = actuallyWireless
-    
-    if (!actuallyWireless) {
-        val helper = helperFile()
-        require(helper.isFile && helper.canExecute()) {
-            app.getString(R.string.error_helper_unavailable)
-        }
-        val process = ProcessBuilder(listOf(helper.absolutePath) + arguments)
-            .redirectErrorStream(true)
-            .start()
-        val output = readProcessOutput(process)
-        return CommandResult(process.waitFor(), stripAnsi(output.trim()))
-    }
 
-    val command = buildString {
-        append(shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH))
-        arguments.forEach {
-            append(' ')
-            append(shellQuote(it))
+        val command = buildString {
+            append(shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH))
+            arguments.forEach {
+                append(' ')
+                append(shellQuote(it))
+            }
         }
+        val result = WirelessAdbManager.runCommand(
+            app,
+            command,
+            allowStreamClose = arguments.any {
+                it == "id" ||
+                    it.contains("late-load") ||
+                    it.contains("/dev/sukisu.ko") ||
+                    it.contains("logcat insmod /dev/sukisu.ko")
+            },
+        )
+        return CommandResult(result.code, stripAnsi(result.output.trim()))
     }
-    val result = WirelessAdbManager.runCommand(
-        app,
-        command,
-        allowStreamClose = arguments.any {
-            it == "id" ||
-                it.contains("late-load") ||
-                it.contains("/dev/sukisu.ko") ||
-                it.contains("logcat insmod /dev/sukisu.ko")
-        },
-    )
-    return CommandResult(result.code, stripAnsi(result.output.trim()))
-}
     private fun shellQuote(value: String) = "'${value.replace("'", "'\\''")}'"
     private fun isStreamClosed(error: Throwable): Boolean =
         generateSequence(error) { it.cause }
