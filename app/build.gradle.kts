@@ -76,7 +76,9 @@ android {
                 "META-INF/*.txt",
                 "**/test/**",
                 "**/androidTest/**",
-                "**/bouncycastle/pqc/**"
+                "**/bouncycastle/pqc/**",
+                "**/bouncycastle/x509/**",
+                "**/CertPathReviewer*.properties"
             )
         }
     }
