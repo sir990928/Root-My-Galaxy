@@ -28,21 +28,24 @@ jobs:
           KS_BASE64: ${{ secrets.SIGNING_KEYSTORE }}
         run: echo "$KS_BASE64" | base64 -d > release.jks
 
+      # 修复后的SDK安装脚本，路径层级完全修正
       - name: Install Android Cmdline Tools & Build Tools
         run: |
           sudo apt update && sudo apt install unzip -y
           mkdir -p $SDK_ROOT/cmdline-tools
           cd $SDK_ROOT/cmdline-tools
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip -q commandlinetools-linux-11076708_latest.zip -d latest
-          # 临时给当前shell追加PATH，立即生效
+          # 关键修复：解压内容直接丢到latest，不嵌套双层目录
+          unzip -q commandlinetools-linux-11076708_latest.zip
+          mv cmdline-tools latest
+          rm -rf commandlinetools-linux-11076708_latest.zip
+          # 当前脚本会话立刻加载PATH
           export PATH=$SDK_ROOT/cmdline-tools/latest/bin:$PATH
-          # 持久化PATH给后续步骤
+          # 持久化PATH给后续所有步骤
           echo "PATH=$SDK_ROOT/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
-          # 同意协议并安装构建工具
+          # 同意SDK协议
           yes | sdkmanager --sdk_root=$SDK_ROOT --licenses
           yes | sdkmanager --sdk_root=$SDK_ROOT "build-tools;$BUILD_TOOLS_VERSION"
-          # 保存apksigner完整路径
           echo "APKSIGNER=$SDK_ROOT/build-tools/$BUILD_TOOLS_VERSION/apksigner" >> $GITHUB_ENV
 
       - name: Build unsigned release apk
