@@ -26,16 +26,23 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("KEYSTORE_FILE") ?: "dummy.jks")
+            storePassword = System.getenv("KEYSTORE_STORE_PASSWORD")
+            keyAlias = System.getenv("KEYSTORE_KEY_ALIAS")
+            keyPassword = System.getenv("KEYSTORE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
-            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // CI通过全局环境变量自动签名，无需本地signingConfigs声明
-            signingConfig = null
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -62,7 +69,6 @@ android {
 
     packaging {
         jniLibs.useLegacyPackaging = true
-        jniLibs.keepDebugSymbols = false
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
 }
@@ -86,8 +92,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3:1.5.0-alpha24")
-    // 注释全量图标库瘦身
-    // implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("com.materialkolor:material-kolor:4.1.1")
     implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
     implementation("com.github.MuntashirAkon:sun-security-android:1.1")
