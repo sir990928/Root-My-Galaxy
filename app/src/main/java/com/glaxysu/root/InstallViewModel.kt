@@ -143,13 +143,24 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private suspend fun selectExecutionMode() {
-        val wirelessExpected = isWirelessDebuggingEnabled() ||
-            AppPreferences.wirelessAdbPaired(app)
-        if (!wirelessExpected) {
-            wirelessExecution = false
-            appendLog(app.getString(R.string.log_execution_mode_local))
-            return
-        }
+    val wirelessExpected = isWirelessDebuggingEnabled() ||
+        AppPreferences.wirelessAdbPaired(app)
+    
+    if (!wirelessExpected) {
+        wirelessExecution = false
+        appendLog("[*] 无线开关关闭，强制本地模式")
+        return
+    }
+
+    try {
+        WirelessAdbManager.ensureConnected(app)
+        wirelessExecution = true
+        appendLog("[*] 无线开关已开，强制无线模式")
+    } catch (e: Exception) {
+        wirelessExecution = false
+        appendLog("[-] 无线连接失败，降级本地: ${e.message}")
+    }
+}
 
         repeat(WIRELESS_CONNECT_ATTEMPTS) { attempt ->
             wirelessExecution = WirelessAdbManager.refreshConnection(
@@ -191,30 +202,41 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     appendLog(app.getString(R.string.log_wireless_adb_helper_staged))
 }
     private suspend fun executeExploit(payload: File) {
-        if (!wirelessExecution) {
-            executeLocalExploit(payload)
-            return
+    // ✅ 实时跟开关走
+    if (isWirelessDebuggingEnabled() || AppPreferences.wirelessAdbPaired(app)) {
+        try {
+            WirelessAdbManager.ensureConnected(app)
+            wirelessExecution = true
+        } catch (e: Exception) {
+            wirelessExecution = false
         }
+    } else {
+        wirelessExecution = false
+    }
+    
+    if (!wirelessExecution) {
+        executeLocalExploit(payload)
+        return
+    }
 
-        appendLog(app.getString(R.string.log_execution_path_wireless))
-        val remotePayload = "$TMP_PATH/${payload.name}"
-        val stagedPayload = stageToTmp(payload, payload.name)
-        require(stagedPayload.code == 0) {
-            app.getString(R.string.error_wireless_adb_stage, payload.name, stagedPayload.output)
-        }
+    appendLog(app.getString(R.string.log_execution_path_wireless))
+    val remotePayload = "$TMP_PATH/${payload.name}"
+    val stagedPayload = stageToTmp(payload, payload.name)
+    require(stagedPayload.code == 0) {
+        app.getString(R.string.error_wireless_adb_stage, payload.name, stagedPayload.output)
+    }
 
-        val logPrefix = mutableState.value.log
-        val exploitCommand = buildString {
-            append("cd ${shellQuote(TMP_PATH)} && ")
-            append("EXPLOIT_ATTEMPTS=${shellQuote(EXPLOIT_ATTEMPTS)} ")
-            append("PSELECT_DELAY_USEC=1000 ")
-            append("P0_ATTEMPT_TIMEOUT_SEC=45 ")
-            append("EXPLOIT_ATTEMPT_TIMEOUT_SEC=120 ")
-            append("CVE43499_ROOT_HELPER=${shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH)} ")
-            append("LD_PRELOAD=${shellQuote(remotePayload)} ")
-            append("/system/bin/true")
-        }
-
+    val logPrefix = mutableState.value.log
+    val exploitCommand = buildString {
+        append("cd ${shellQuote(TMP_PATH)} && ")
+        append("EXPLOIT_ATTEMPTS=${shellQuote(EXPLOIT_ATTEMPTS)} ")
+        append("PSELECT_DELAY_USEC=1000 ")
+        append("P0_ATTEMPT_TIMEOUT_SEC=45 ")
+        append("EXPLOIT_ATTEMPT_TIMEOUT_SEC=120 ")
+        append("CVE43499_ROOT_HELPER=${shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH)} ")
+        append("LD_PRELOAD=${shellQuote(remotePayload)} ")
+        append("/system/bin/true")
+    }
         val process = WirelessAdbManager.openProcess(app, exploitCommand)
         val startedAt = SystemClock.elapsedRealtime()
         var lastProgressAt = startedAt
