@@ -1,4 +1,4 @@
-name: Galaxy-Su 自动瘦身构建
+name: Galaxy-Su 瘦身构建 控制包体积
 on:
   push:
     branches: [main]
@@ -27,58 +27,45 @@ jobs:
           distribution: temurin
           cache: gradle
 
-      # 提前还原密钥文件
       - name: 还原签名密钥
         env:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > release.jks
 
-      # 安装全套工具链
-      - name: 安装打包工具
+      - name: 安装工具链
         run: sudo apt update && sudo apt install -y zip unzip binutils-aarch64-linux-gnu zipalign apksigner
 
-      - name: 安装Android SDK
+      - name: Android SDK
         uses: android-actions/setup-android@v3
 
-      # Gradle构建无签名Release包
-      - name: Gradle 编译打包
+      - name: Gradle编译无签名包
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      # 自动识别真实APK文件，写入环境变量
-      - name: 自动检测APK路径
+      - name: 自动识别APK
         run: |
-          echo "=== 打印release目录文件 ==="
           ls -la ${{ env.APK_DIR }}
-          # 自动取目录下第一个apk
           APK_FILE=$(ls ${{ env.APK_DIR }}/*.apk | head -n1)
-          if [ -z "$APK_FILE" ]; then
-            echo "错误：目录未找到APK文件"
-            exit 1
-          fi
-          echo "识别到APK：$APK_FILE"
           echo "RAW_APK=$APK_FILE" >> $GITHUB_ENV
 
-      # 解压APK、删除旧签名、批量strip全部so（包含libconscrypt_jni.so）
-      - name: 批量瘦身原生库
+      - name: strip so + 差异化打包（关键控体积）
         run: |
           rm -rf ${{ env.TEMP_DIR }}
           mkdir ${{ env.TEMP_DIR }}
           cd ${{ env.TEMP_DIR }}
           unzip -q ${{ env.RAW_APK }}
-          # 删除旧签名文件夹，避免重签名冲突
           rm -rf META-INF
-          # 剥离所有arm64-v8a架构so的调试符号
+          # 剥离所有so调试符号瘦身
           aarch64-linux-gnu-strip --strip-all lib/arm64-v8a/*.so
-          # -0 强制resources.arsc不压缩，修复Android 11+ -124安装报错
-          zip -r -q -0 ${{ env.UNSIGNED_TMP }} .
+          # 第一步：全部文件默认压缩（so、图片、资源全部压缩）
+          zip -r -q ../${{ env.UNSIGNED_TMP }} .
+          # 第二步：仅单独把resources.arsc改为不压缩，解决-124报错，其余保持压缩
+          zip -q -0 ../${{ env.UNSIGNED_TMP }} resources.arsc
           cd ..
 
-      # 4字节标准对齐（签名前必须执行）
-      - name: Zipalign 对齐APK
+      - name: Zipalign 4字节对齐
         run: zipalign -p -f 4 ${{ env.UNSIGNED_TMP }} ${{ env.ALIGNED_TMP }}
 
-      # apksigner完整签名，生成可直接安装成品
-      - name: Apksigner 签名成品包
+      - name: Apksigner签名
         run: |
           apksigner sign \
             --ks release.jks \
@@ -88,12 +75,10 @@ jobs:
             --out ${{ env.RAW_APK }} \
             ${{ env.ALIGNED_TMP }}
 
-      # 清理临时文件
-      - name: 清理缓存
+      - name: 清理临时文件
         run: rm -rf ${{ env.TEMP_DIR }} ${{ env.UNSIGNED_TMP }} ${{ env.ALIGNED_TMP }} release.jks
 
-      # 上传最终成品APK
-      - name: 导出构建产物
+      - name: 上传成品APK
         uses: actions/upload-artifact@v4
         with:
           name: App-${{ env.TARGET }}

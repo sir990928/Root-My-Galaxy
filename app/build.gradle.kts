@@ -22,21 +22,18 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += "-DANDROID_STL=none"
-                // 全局关闭所有调试符号
                 cFlags += "-g0"
                 cppFlags += "-g0"
             }
         }
     }
 
-    // 新增：强制arsc资源不压缩，匹配流水线zip -0参数，彻底杜绝-124解析失败
     aaptOptions {
         noCompress += ".arsc"
     }
 
     signingConfigs {
         create("release") {
-            // 修正兜底路径，向上一层读取根目录的release.jks
             storeFile = file(System.getenv("KEYSTORE_FILE") ?: "../release.jks")
             storePassword = System.getenv("KEYSTORE_STORE_PASSWORD")
             keyAlias = System.getenv("KEYSTORE_KEY_ALIAS")
@@ -52,6 +49,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // 关键：不开启gradle自动签名，避免构建密码缺失报错，签名交给CI apksigner
+            signingConfig = null
         }
     }
 
@@ -78,7 +77,17 @@ android {
 
     packaging {
         jniLibs.useLegacyPackaging = true
-        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        resources {
+            excludes += listOf(
+                "META-INF/*.kotlin_module",
+                "META-INF/LICENSE",
+                "META-INF/NOTICE",
+                "META-INF/*.md",
+                "META-INF/*.txt",
+                "**/test/**",
+                "**/androidTest/**"
+            )
+        }
     }
 }
 
@@ -88,6 +97,10 @@ kotlin {
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
+            // 增加kotlin字节码优化
+            "-Xno-param-assertions",
+            "-Xno-call-assertions",
+            "-Xno-receiver-assertions"
         )
     }
 }
@@ -105,8 +118,10 @@ dependencies {
     implementation("com.materialkolor:material-kolor:4.1.1")
     implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
     implementation("com.github.MuntashirAkon:sun-security-android:1.1")
+    // 体积大户：conscrypt-android 2MB原生库，想大幅缩包建议注释替换tink
     implementation("org.conscrypt:conscrypt-android:2.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:core-ktx:1.7.0")
