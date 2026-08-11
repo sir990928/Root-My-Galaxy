@@ -38,30 +38,14 @@ jobs:
           echo "KEYSTORE_KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> $GITHUB_ENV
           echo "KEYSTORE_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> $GITHUB_ENV
 
-      - name: 安装基础工具 & aarch64 strip 极致压缩工具
-        run: sudo apt update && sudo apt install -y zip unzip wget binutils-aarch64-linux-gnu
+      - name: 安装基础工具
+        run: sudo apt update && sudo apt install -y zip unzip wget
 
       - name: 安装 Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 编译so + 彻底清除全部调试符号
-        run: |
-          chmod +x gradlew
-          ./gradlew buildCMakeRelWithDebInfo[arm64-v8a]
-          SO_FOLDER=app/build/intermediates/cmake/release/arm64-v8a
-          if [ -d "$SO_FOLDER" ]; then
-            aarch64-linux-gnu-strip --strip-all $SO_FOLDER/lib*.so
-            echo "so 已删除全部调试符号，极致压缩完成"
-          fi
-
-      - name: 打包Release APK（自动签名）
+      - name: 打包Release APK（自动签名，CMake编译直接产出极简无调试so）
         run: ./gradlew assembleRelease --no-daemon --stacktrace
-
-      - name: zipalign 对齐优化APK体积
-        run: |
-          APK_FILE=app/build/outputs/apk/release/app-release.apk
-          zipalign -f 4 $APK_FILE aligned.apk
-          mv aligned.apk $APK_FILE
 
       - name: 上传成品APK
         uses: actions/upload-artifact@v4
