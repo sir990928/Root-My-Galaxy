@@ -48,25 +48,23 @@ jobs:
         run: |
           APK=$(ls app/build/outputs/apk/release/*.apk)
           
-          echo "=== APK 信息 ==="
-          echo "文件: $APK"
-          echo "大小: $(du -h "$APK" | cut -f1)"
+          echo "=== 签名信息 ==="
+          echo "APK: $APK"
           
-          echo "=== 开始签名 ==="
-          
-          # 使用 jarsigner（JDK 自带，路径不存在问题）
           jarsigner \
             -verbose \
             -sigalg SHA256withRSA \
             -digestalg SHA-256 \
             -keystore release.jks \
-            -storepass ${{ secrets.SIGNING_KEYSTORE_PASSWORD }} \
-            -keypass ${{ secrets.SIGNING_KEY_PASSWORD }} \
+            -storepass GalaxyS25@2026 \
+            -keypass GalaxyS25@2026 \
             "$APK" \
-            ${{ secrets.SIGNING_KEY_ALIAS }}
+            release
           
           echo "=== 验证签名 ==="
           jarsigner -verify -verbose "$APK"
+          
+          echo "✅ 签名完成"
 
       - name: 上传成品APK
         uses: actions/upload-artifact@v4

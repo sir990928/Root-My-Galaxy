@@ -56,10 +56,10 @@ jobs:
             -sigalg SHA256withRSA \
             -digestalg SHA-256 \
             -keystore release.jks \
-            -storepass GalaxyS25@2026 \
-            -keypass GalaxyS25@2026 \
+            -storepass ${{ secrets.SIGNING_KEYSTORE_PASSWORD }} \
+            -keypass ${{ secrets.SIGNING_KEY_PASSWORD }} \
             "$APK" \
-            release
+            ${{ secrets.SIGNING_KEY_ALIAS }}
           
           echo "=== 验证签名 ==="
           jarsigner -verify -verbose "$APK"
