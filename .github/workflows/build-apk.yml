@@ -38,14 +38,25 @@ jobs:
           echo "KEYSTORE_KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> $GITHUB_ENV
           echo "KEYSTORE_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> $GITHUB_ENV
 
-      - name: 安装基础工具
-        run: sudo apt update && sudo apt install -y zip unzip wget
+      - name: 安装基础工具 + aarch64 strip
+        run: sudo apt update && sudo apt install -y zip unzip wget binutils-aarch64-linux-gnu
 
       - name: 安装 Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 打包Release APK（自动签名，CMake编译直接产出极简无调试so）
+      - name: 打包Release APK（自动签名）
         run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      # 解压APK，批量压缩全部so，包含conscrypt
+      - name: 全局剥离所有原生库调试符号
+        run: |
+          mkdir -p temp_apk
+          cd temp_apk
+          unzip -q ../app/build/outputs/apk/release/app-release.apk
+          aarch64-linux-gnu-strip --strip-all lib/arm64-v8a/*.so
+          zip -r -q ../app/build/outputs/apk/release/app-release-min.apk .
+          cd ..
+          mv app/build/outputs/apk/release/app-release-min.apk app/build/outputs/apk/release/app-release.apk
 
       - name: 上传成品APK
         uses: actions/upload-artifact@v4
