@@ -1,76 +1,76 @@
-name: Build Root-My-Galaxy Release APK
+name: 仅构建 S9380ZHU1AYA1 APK（自动签名，不编译漏洞so）
+
 on:
   push:
-    branches: [ main ]
+    branches: [main]
+    paths:
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
 env:
-  SDK_ROOT: ${{ github.workspace }}/android-sdk
-  BUILD_TOOLS_VERSION: "35.0.0"
-  APK_OUT_DIR: ${{ github.workspace }}/app/build/outputs/apk/release
+  TARGET: pa3q-S9380ZHU1AYA1
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
 
-      - name: Setup JDK 21
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 配置 JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: "21"
           distribution: temurin
           cache: gradle
 
-      - name: Write keystore file from secret
+      - name: 安装基础工具
+        run: sudo apt update && sudo apt install -y zip unzip wget
+
+      # 官方Action自动配置SDK、build-tools，自带全局apksigner
+      - name: 安装 Android SDK & BuildTools
+        uses: android-actions/setup-android@v3
+        with:
+          accept-licenses: true
+
+      # 还原签名密钥文件
+      - name: 还原签名密钥
         env:
           KS_BASE64: ${{ secrets.SIGNING_KEYSTORE }}
         run: echo "$KS_BASE64" | base64 -d > release.jks
 
-      # 修复后的SDK安装脚本，路径层级完全修正
-      - name: Install Android Cmdline Tools & Build Tools
+      - name: 编译未签名Release包
         run: |
-          sudo apt update && sudo apt install unzip -y
-          mkdir -p $SDK_ROOT/cmdline-tools
-          cd $SDK_ROOT/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          # 关键修复：解压内容直接丢到latest，不嵌套双层目录
-          unzip -q commandlinetools-linux-11076708_latest.zip
-          mv cmdline-tools latest
-          rm -rf commandlinetools-linux-11076708_latest.zip
-          # 当前脚本会话立刻加载PATH
-          export PATH=$SDK_ROOT/cmdline-tools/latest/bin:$PATH
-          # 持久化PATH给后续所有步骤
-          echo "PATH=$SDK_ROOT/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
-          # 同意SDK协议
-          yes | sdkmanager --sdk_root=$SDK_ROOT --licenses
-          yes | sdkmanager --sdk_root=$SDK_ROOT "build-tools;$BUILD_TOOLS_VERSION"
-          echo "APKSIGNER=$SDK_ROOT/build-tools/$BUILD_TOOLS_VERSION/apksigner" >> $GITHUB_ENV
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Build unsigned release apk
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
-
-      - name: Sign APK with apksigner
+      # apksigner自动签名
+      - name: APK自动签名
         env:
-          KS_PWD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
-          KEY_PWD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          STORE_PWD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PWD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          APK=$(ls $APK_OUT_DIR/*.apk | head -1)
-          ${{ env.APKSIGNER }} sign \
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          apksigner sign \
             --ks release.jks \
-            --ks-pass pass:$KS_PWD \
+            --ks-pass pass:$STORE_PWD \
             --key-pass pass:$KEY_PWD \
             --ks-key-alias $KEY_ALIAS \
             "$APK"
 
-      - name: Upload signed APK artifact
+      - name: 上传已签名APK
         uses: actions/upload-artifact@v4
         with:
-          name: Root-My-Galaxy-v12
-          path: ${{ env.APK_OUT_DIR }}/*.apk
+          name: Signed-App-${{ env.TARGET }}
+          retention-days: 30
+          if-no-files-found: error
+          path: app/build/outputs/apk/release/*.apk
 
-      - name: Clean secret keystore
+      # 永久清理密钥文件
+      - name: 删除密钥文件
         if: always()
         run: rm -f release.jks
