@@ -179,17 +179,28 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun stageBootstrapHelper() {
-        val helper = helperFile()
-        require(helper.isFile && helper.canRead() && (wirelessExecution || helper.canExecute())) {
-            app.getString(R.string.error_helper_unavailable)
-        }
-        if (!wirelessExecution) return
-        val result = WirelessAdbManager.stageFile(app, helper, WirelessAdbManager.REMOTE_HELPER_PATH)
-        require(result.code == 0) {
-            app.getString(R.string.error_wireless_adb_stage, helper.name, result.output)
-        }
-        appendLog(app.getString(R.string.log_wireless_adb_helper_staged))
+    val helper = helperFile()
+    require(helper.isFile && helper.canRead() && (wirelessExecution || helper.canExecute())) {
+        app.getString(R.string.error_helper_unavailable)
     }
+    if (!wirelessExecution) {
+        try {
+            if (WirelessAdbManager.refreshConnection(app, forceReconnect = true)) {
+                wirelessExecution = true
+                appendLog("[*] Wireless detected, switching to wireless mode")
+            } else {
+                return
+            }
+        } catch (e: Exception) {
+            return
+        }
+    }
+    val result = WirelessAdbManager.stageFile(app, helper, WirelessAdbManager.REMOTE_HELPER_PATH)
+    require(result.code == 0) {
+        app.getString(R.string.error_wireless_adb_stage, helper.name, result.output)
+    }
+    appendLog(app.getString(R.string.log_wireless_adb_helper_staged))
+}
 
     private suspend fun executeExploit(payload: File) {
         if (!wirelessExecution) {
