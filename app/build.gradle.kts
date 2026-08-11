@@ -66,12 +66,14 @@ android {
     }
 
     packaging {
-        jniLibs.useLegacyPackaging = true
+        // 关闭强制不压缩so，AGP打包自动压缩lib*.so
+        jniLibs.useLegacyPackaging = false
         resources {
             excludes += listOf(
                 "META-INF/*.kotlin_module",
                 "META-INF/LICENSE",
                 "META-INF/NOTICE",
+                "META-INF/conscrypt*",
                 "META-INF/*.md",
                 "META-INF/*.txt",
                 "**/test/**",
@@ -96,7 +98,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2026.05.01"))
+    implementation(platform("androidx.compose:compose-bom:2026.08.11"))
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")

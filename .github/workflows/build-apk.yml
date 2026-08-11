@@ -6,6 +6,9 @@ on:
 
 env:
   APK_DIR: ${{ github.workspace }}/app/build/outputs/apk/release
+  SDK_ROOT: ${{ github.workspace }}/android-sdk
+  BUILD_TOOLS_VERSION: "35.0.0"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,42 +23,45 @@ jobs:
           distribution: temurin
           cache: gradle
 
-      - name: 生成密钥文件
+      - name: 还原密钥文件
         env:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > release.jks
 
-      - name: 安装Android SDK工具
-        uses: android-actions/setup-android@v3
+      - name: 安装Android SDK & Build Tools（含apksigner）
+        run: |
+          sudo apt update && sudo apt install unzip -y
+          mkdir -p $SDK_ROOT/cmdline-tools
+          cd $SDK_ROOT/cmdline-tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip commandlinetools-linux-11076708_latest.zip -d latest
+          echo "export PATH=$SDK_ROOT/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+          echo "y" | sdkmanager --sdk_root=$SDK_ROOT "build-tools;$BUILD_TOOLS_VERSION"
+          echo "APKSIGNER=$SDK_ROOT/build-tools/$BUILD_TOOLS_VERSION/apksigner" >> $GITHUB_ENV
 
-      # 编译无签名Release包
-      - name: Gradle编译
+      - name: Gradle编译无签名Release包
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      # 自动找到编译输出apk
-      - name: 获取APK路径
+      - name: 自动获取APK路径
         run: |
-          ls ${{ env.APK_DIR }}
-          APK=$(ls ${{ env.APK_DIR }}/*.apk | head -n1)
-          echo "APK=$APK" >> $GITHUB_ENV
+          ls -la $APK_DIR
+          APK_FILE=$(ls $APK_DIR/*.apk | head -n1)
+          echo "FINAL_APK=$APK_FILE" >> $GITHUB_ENV
 
-      # 直接对原始编译好的apk签名，不解压、不修改库文件
-      - name: 签名APK
+      - name: apksigner 签名成品
         run: |
-          apksigner sign \
+          ${{ env.APKSIGNER }} sign \
             --ks release.jks \
             --ks-pass pass:${{ secrets.SIGNING_KEYSTORE_PASSWORD }} \
             --key-pass pass:${{ secrets.SIGNING_KEY_PASSWORD }} \
             --ks-key-alias ${{ secrets.SIGNING_KEY_ALIAS }} \
-            ${{ env.APK }}
+            ${{ env.FINAL_APK }}
 
-      # 上传成品
-      - name: 导出APK
+      - name: 上传APK产物
         uses: actions/upload-artifact@v4
         with:
-          name: Root-My-Galaxy-Release
-          path: ${{ env.APK }}
+          name: Root-My-Galaxy-v0.2.6
+          path: ${{ env.FINAL_APK }}
 
-      # 清理密钥
-      - name: 清理文件
+      - name: 清理密钥文件
         run: rm -f release.jks

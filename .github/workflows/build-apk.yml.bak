@@ -1,24 +1,17 @@
-name: Galaxy-Su 瘦身构建 控制包体积
+name: Galaxy-Su 构建发布
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 env:
-  TARGET: Galaxy-Su
   APK_DIR: ${{ github.workspace }}/app/build/outputs/apk/release
-  TEMP_DIR: ${{ github.workspace }}/temp_apk_work
-  UNSIGNED_TMP: ${{ github.workspace }}/temp-noalign.apk
-  ALIGNED_TMP: ${{ github.workspace }}/temp-aligned.apk
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: 拉取源码
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: 配置JDK21
         uses: actions/setup-java@v4
@@ -27,60 +20,42 @@ jobs:
           distribution: temurin
           cache: gradle
 
-      - name: 还原签名密钥
+      - name: 生成密钥文件
         env:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > release.jks
 
-      - name: 安装工具链
-        run: sudo apt update && sudo apt install -y zip unzip binutils-aarch64-linux-gnu zipalign apksigner
-
-      - name: Android SDK
+      - name: 安装Android SDK工具
         uses: android-actions/setup-android@v3
 
-      - name: Gradle编译无签名包
+      # 编译无签名Release包
+      - name: Gradle编译
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: 自动识别APK
+      # 自动找到编译输出apk
+      - name: 获取APK路径
         run: |
-          ls -la ${{ env.APK_DIR }}
-          APK_FILE=$(ls ${{ env.APK_DIR }}/*.apk | head -n1)
-          echo "RAW_APK=$APK_FILE" >> $GITHUB_ENV
+          ls ${{ env.APK_DIR }}
+          APK=$(ls ${{ env.APK_DIR }}/*.apk | head -n1)
+          echo "APK=$APK" >> $GITHUB_ENV
 
-      - name: strip so + 差异化打包（关键控体积）
-        run: |
-          rm -rf ${{ env.TEMP_DIR }}
-          mkdir ${{ env.TEMP_DIR }}
-          cd ${{ env.TEMP_DIR }}
-          unzip -q ${{ env.RAW_APK }}
-          rm -rf META-INF
-          # 剥离所有so调试符号瘦身
-          aarch64-linux-gnu-strip --strip-all lib/arm64-v8a/*.so
-          # 第一步：全部文件默认压缩（so、图片、资源全部压缩）
-          zip -r -q ../${{ env.UNSIGNED_TMP }} .
-          # 第二步：仅单独把resources.arsc改为不压缩，解决-124报错，其余保持压缩
-          zip -q -0 ../${{ env.UNSIGNED_TMP }} resources.arsc
-          cd ..
-
-      - name: Zipalign 4字节对齐
-        run: zipalign -p -f 4 ${{ env.UNSIGNED_TMP }} ${{ env.ALIGNED_TMP }}
-
-      - name: Apksigner签名
+      # 直接对原始编译好的apk签名，不解压、不修改库文件
+      - name: 签名APK
         run: |
           apksigner sign \
             --ks release.jks \
             --ks-pass pass:${{ secrets.SIGNING_KEYSTORE_PASSWORD }} \
             --key-pass pass:${{ secrets.SIGNING_KEY_PASSWORD }} \
             --ks-key-alias ${{ secrets.SIGNING_KEY_ALIAS }} \
-            --out ${{ env.RAW_APK }} \
-            ${{ env.ALIGNED_TMP }}
+            ${{ env.APK }}
 
-      - name: 清理临时文件
-        run: rm -rf ${{ env.TEMP_DIR }} ${{ env.UNSIGNED_TMP }} ${{ env.ALIGNED_TMP }} release.jks
-
-      - name: 上传成品APK
+      # 上传成品
+      - name: 导出APK
         uses: actions/upload-artifact@v4
         with:
-          name: App-${{ env.TARGET }}
-          retention-days: 30
-          path: ${{ env.RAW_APK }}
+          name: Root-My-Galaxy-Release
+          path: ${{ env.APK }}
+
+      # 清理密钥
+      - name: 清理文件
+        run: rm -f release.jks
