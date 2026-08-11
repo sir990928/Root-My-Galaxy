@@ -44,27 +44,45 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace --no-configuration-cache
 
-      - name: 自动签名APK
+      - name: 自动签名并对齐APK
         run: |
           APK=$(ls app/build/outputs/apk/release/*.apk)
+          ALIGNED_APK="app/build/outputs/apk/release/app-release-aligned.apk"
           
           echo "=== 签名信息 ==="
-          echo "APK: $APK"
+          echo "原始APK: $APK"
           
-          jarsigner \
-            -verbose \
-            -sigalg SHA256withRSA \
-            -digestalg SHA-256 \
-            -keystore release.jks \
-            -storepass ${{ secrets.SIGNING_KEYSTORE_PASSWORD }} \
-            -keypass ${{ secrets.SIGNING_KEY_PASSWORD }} \
-            "$APK" \
-            ${{ secrets.SIGNING_KEY_ALIAS }}
+          # 先做4字节对齐
+          echo "=== 4字节对齐 ==="
+          ZIPALIGN=$(find $ANDROID_HOME/build-tools -name zipalign | sort | tail -1)
+          echo "zipalign: $ZIPALIGN"
+          $ZIPALIGN -v -p 4 "$APK" "$ALIGNED_APK"
+          
+          echo "=== 验证对齐 ==="
+          $ZIPALIGN -c -v 4 "$ALIGNED_APK"
+          
+          # 使用 apksigner 进行 V2+V3 签名
+          echo "=== V2+V3签名 ==="
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort | tail -1)
+          echo "apksigner: $APKSIGNER"
+          
+          $APKSIGNER sign \
+            --ks release.jks \
+            --ks-pass pass:${{ secrets.SIGNING_KEYSTORE_PASSWORD }} \
+            --ks-key-alias ${{ secrets.SIGNING_KEY_ALIAS }} \
+            --key-pass pass:${{ secrets.SIGNING_KEY_PASSWORD }} \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            "$ALIGNED_APK"
           
           echo "=== 验证签名 ==="
-          jarsigner -verify -verbose "$APK"
+          $APKSIGNER verify --verbose "$ALIGNED_APK"
           
-          echo "✅ 签名完成"
+          # 替换原文件
+          rm -f "$APK"
+          mv "$ALIGNED_APK" "$APK"
+          
+          echo "✅ V2+V3签名和对齐完成"
 
       - name: 上传成品APK
         uses: actions/upload-artifact@v4
