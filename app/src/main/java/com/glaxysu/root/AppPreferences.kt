@@ -4,6 +4,7 @@ import android.app.LocaleManager
 import android.content.Context
 import android.os.LocaleList
 import androidx.annotation.StringRes
+import java.io.File
 
 enum class AccentColor(val storedValue: String) {
     Dynamic("dynamic"),
@@ -61,9 +62,12 @@ object AppPreferences {
     private const val THEME_MODE = "theme_mode"
     private const val ADVANCED_MODE = "advanced_mode"
     private const val ROOT_MANAGER = "root_manager"
+    private const val INSTALLED_MANAGER = "installed_manager"
+    private const val INSTALLED_BOOT_ID = "installed_boot_id"
     private const val WIRELESS_ADB_PAIRED = "wireless_adb_paired"
-    private const val WIRELESS_ADB_MODE = "wireless_adb_mode"
     private const val CONSUMED_INSTALL_REQUEST = "consumed_install_request"
+    @Volatile
+    private var sessionInstalledManager: RootManager? = null
 
     fun accentColor(context: Context): AccentColor = AccentColor.fromStoredValue(
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
@@ -123,14 +127,40 @@ object AppPreferences {
             .commit()
     }
 
-    fun wirelessAdbMode(context: Context): Boolean =
-        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-            .getBoolean(WIRELESS_ADB_MODE, true)
-
-    fun setWirelessAdbMode(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-            .edit().putBoolean(WIRELESS_ADB_MODE, enabled).apply()
+    fun markSessionInstalled(manager: RootManager) {
+        sessionInstalledManager = manager
     }
+
+    fun markInstalled(context: Context, manager: RootManager) {
+        markSessionInstalled(manager)
+        val bootId = currentBootId() ?: return
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
+            .putString(INSTALLED_MANAGER, manager.storedValue)
+            .putString(INSTALLED_BOOT_ID, bootId)
+            .commit()
+    }
+
+    fun installedManager(context: Context): RootManager? {
+        val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        val savedBootId = preferences.getString(INSTALLED_BOOT_ID, null)
+        if (savedBootId.isNullOrBlank() || savedBootId != currentBootId()) return null
+        return preferences.getString(INSTALLED_MANAGER, null)
+            ?.let(RootManager::fromStoredValue)
+    }
+
+    fun isInstalled(context: Context, manager: RootManager): Boolean =
+        isSessionInstalled(manager) || installedManager(context) == manager
+
+    fun isSessionInstalled(manager: RootManager): Boolean =
+        sessionInstalledManager == manager
+
+    private fun currentBootId(): String? = runCatching {
+        File("/proc/sys/kernel/random/boot_id")
+            .readText(Charsets.UTF_8)
+            .trim()
+            .takeIf(String::isNotBlank)
+    }.getOrNull()
 
     @Synchronized
     fun consumeInstallRequest(context: Context, requestId: String?): Boolean {

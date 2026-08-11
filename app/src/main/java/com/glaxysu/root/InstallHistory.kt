@@ -5,6 +5,7 @@ import android.util.AtomicFile
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
+import kotlin.math.max
 
 enum class InstallRunResult {
     Running,
@@ -29,6 +30,26 @@ class InstallHistoryStore(private val context: Context) {
         .orEmpty()
         .mapNotNull(::decodeOrQuarantine)
         .sortedByDescending(InstallHistoryEntry::startedAtMillis)
+
+    /**
+     * Older successful records did not store the selected manager as a field.
+     * Keep those installs visible after upgrading by reading the completion log.
+     */
+    fun latestSuccessfulManagerSinceBoot(bootStartedAtMillis: Long): RootManager? =
+        load()
+            .firstOrNull {
+                it.result == InstallRunResult.Succeeded &&
+                    it.startedAtMillis >= max(0L, bootStartedAtMillis)
+            }
+            ?.let { entry ->
+                when {
+                    entry.log.contains("Root implementation: SukiSU", ignoreCase = true) ->
+                        RootManager.SukiSU
+                    entry.log.contains("Root implementation: KernelSU", ignoreCase = true) ->
+                        RootManager.KernelSU
+                    else -> null
+                }
+            }
 
     fun closeInterruptedRuns(): List<InstallHistoryEntry> = load().map { entry ->
         if (entry.result == InstallRunResult.Running) {

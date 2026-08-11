@@ -30,6 +30,8 @@
     <string name="how_it_works">How it works</string>
     <string name="kernelsu_card_title">KernelSU</string>
     <string name="kernelsu_card_description">A kernel-based root solution for Android</string>
+    <string name="sukisu_card_title">SukiSU Ultra</string>
+    <string name="sukisu_card_description">A KernelSU-compatible root implementation</string>
     <string name="firmware">Firmware</string>
     <string name="system">System</string>
     <string name="system_abi">System ABI</string>
@@ -115,6 +117,11 @@
     <string name="log_bootstrap_root">[+] Bootstrap root acquired</string>
     <string name="log_ksu_staged">[+] KernelSU staging complete</string>
     <string name="log_ksu_control_verified">[+] KernelSU control channel verified</string>
+    <string name="log_execution_mode_local">[*] Execution mode: Local</string>
+    <string name="log_execution_mode_wireless">[*] Execution mode: Wireless debugging</string>
+    <string name="log_execution_mode_local_wireless_unavailable">[*] Execution mode: Local (Wireless debugging is not ready)</string>
+    <string name="log_execution_path_local">[*] Actual execution path: Local helper</string>
+    <string name="log_execution_path_wireless">[*] Actual execution path: Wireless debugging shell</string>
     <string name="error_helper_unavailable">The bootstrap helper is not executable</string>
     <string name="error_exploit_stalled">The exploit log did not advance for 90 seconds</string>
     <string name="error_exploit_timeout">The exploit exceeded the 15-minute limit</string>
@@ -141,6 +148,10 @@
     <string name="open_github">Open GitHub</string>
     <string name="github_card_title">Explore Glaxy Su</string>
     <string name="github_card_description">View the source code and usage instructions.</string>
+    <string name="payloads_card_title">Explore Samsung compatibility</string>
+    <string name="payloads_card_description">Samsung device compatibility exploit payloads</string>
+    <string name="exploit_source_card_title">Explore exploit</string>
+    <string name="exploit_source_card_description">Original exploit project</string>
     <string name="action_continue">Continue anyway</string>
     <string name="action_next">Next</string>
     <string name="connection">Connection</string>

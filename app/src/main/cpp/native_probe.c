@@ -257,7 +257,10 @@ Java_com_glaxysu_root_NativeProbe_isKernelSuActive(JNIEnv *env,
   (void)env;
   (void)thiz;
 
-  if (access("/sys/module/kernelsu", F_OK) == 0) {
+  if (access("/sys/module/kernelsu", F_OK) == 0 ||
+      access("/sys/module/sukisu", F_OK) == 0 ||
+      access("/sys/module/sukisu_ultra", F_OK) == 0 ||
+      access("/sys/module/ksu", F_OK) == 0) {
     return JNI_TRUE;
   }
 
@@ -276,7 +279,10 @@ Java_com_glaxysu_root_NativeProbe_isKernelSuActive(JNIEnv *env,
 
   const char *line = modules;
   while (line != NULL && *line != '\0') {
-    if (strncmp(line, "kernelsu ", sizeof("kernelsu ") - 1) == 0) {
+    if (strncmp(line, "kernelsu ", sizeof("kernelsu ") - 1) == 0 ||
+        strncmp(line, "sukisu ", sizeof("sukisu ") - 1) == 0 ||
+        strncmp(line, "sukisu_ultra ", sizeof("sukisu_ultra ") - 1) == 0 ||
+        strncmp(line, "ksu ", sizeof("ksu ") - 1) == 0) {
       return JNI_TRUE;
     }
     line = strchr(line, '\n');

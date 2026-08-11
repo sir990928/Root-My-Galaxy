@@ -20,6 +20,10 @@
     <string name="open_github">打开 GitHub</string>
     <string name="github_card_title">了解 Glaxy Su</string>
     <string name="github_card_description">查看源代码和使用方法。</string>
+    <string name="payloads_card_title">了解三星设备适配</string>
+    <string name="payloads_card_description">关于三星设备适配 exploit payload</string>
+    <string name="exploit_source_card_title">了解 exploit</string>
+    <string name="exploit_source_card_description">原始 exploit 项目</string>
     <string name="action_continue">忽略并继续</string><string name="action_next">下一步</string>
     <string name="advanced">高级</string><string name="advanced_mode">高级模式</string><string name="advanced_mode_description">安装时手动选择设备兼容 payload</string>
     <string name="connection">连接</string>
@@ -45,6 +49,11 @@
     <string name="error_wireless_adb_command">无线调试命令失败（返回码 %1$d）：%2$s</string>
     <string name="log_wireless_adb_connected">[+] 无线调试已连接</string>
     <string name="log_wireless_adb_helper_staged">[+] 已通过无线调试发送 bootstrap helper</string>
+    <string name="log_execution_mode_local">[*] 执行模式：本地</string>
+    <string name="log_execution_mode_wireless">[*] 执行模式：无线调试</string>
+    <string name="log_execution_mode_local_wireless_unavailable">[*] 执行模式：本地（无线调试暂未就绪）</string>
+    <string name="log_execution_path_local">[*] 实际执行路径：本地 helper</string>
+    <string name="log_execution_path_wireless">[*] 实际执行路径：无线调试 shell</string>
     <string name="shizuku_mode">使用 Shizuku</string><string name="shizuku_mode_description">Shizuku 可用时优先使用，否则使用 Glaxy Su 内置执行器。</string><string name="shizuku_not_running_title">Shizuku 未在运行</string><string name="shizuku_not_running_body">可以通过无线调试启动 Shizuku；如果不启动，Glaxy Su 会自动使用内置执行器。</string><string name="action_download_shizuku">打开 Shizuku</string><string name="error_shizuku_unavailable">Shizuku 未在运行，已切换到 Glaxy Su 内置执行器。</string><string name="error_shizuku_permission">未授予 Shizuku 权限，已切换到 Glaxy Su 内置执行器。</string><string name="error_shizuku_stage">无法通过 Shizuku 部署 %1$s：%2$s</string><string name="log_shizuku_prepare">[*] 正在准备 Shizuku 执行</string><string name="log_shizuku_permission">[+] 已授予 Shizuku 权限</string>
     <string name="repo_profile_missing">支持配置 %1$s 已不可用</string>
     <string name="select_device_title">选择支持的 payload</string><string name="select_device_description">按设备型号和内核版本选择 payload。</string><string name="show_my_device_only">仅显示我的设备</string><string name="no_matching_devices">没有与此型号和内核版本匹配的 payload。</string>
@@ -66,6 +75,8 @@
     <string name="root_manager_sukisu_description">兼容 KernelSU 的 SukiSU Root 方案</string>
     <string name="how_it_works">工作原理</string>
     <string name="kernelsu_card_description">基于内核的 Android Root 方案</string>
+    <string name="sukisu_card_title">SukiSU Ultra</string>
+    <string name="sukisu_card_description">兼容 KernelSU 的 Root 方案</string>
     <string name="history_shizuku_used">已使用 Shizuku</string>
     <string name="history_shizuku_not_used">未使用 Shizuku</string>
 </resources>

@@ -240,6 +240,10 @@ private const val KERNEL_SU_MANAGER_PACKAGE = "me.weishu.kernelsu"
 private const val SUKI_SU_MANAGER_PACKAGE = "com.sukisu.ultra"
 private const val SUKI_SU_MANAGER_URL = "https://github.com/SukiSU-Ultra/SukiSU-Ultra/releases/latest"
 private const val KERNEL_SU_HOME_URL = "https://kernelsu.org/"
+private const val SUKI_SU_HOME_URL = "https://github.com/SukiSU-Ultra/SukiSU-Ultra"
+private const val ROOT_MY_GALAXY_PAYLOADS_URL = "https://github.com/BuSung-dev/Root-My-Galaxy-Payloads.git"
+private const val CVE_EXPLOIT_SOURCE_URL =
+    "https://github.com/NebuSec/CyberMeowfia/tree/main/IonStack/CVE-2026-43499/exploit"
 
 private fun managerPackage(manager: RootManager): String = when (manager) {
     RootManager.KernelSU -> KERNEL_SU_MANAGER_PACKAGE
@@ -1078,11 +1082,7 @@ private fun SettingsPage(
 
     LaunchedEffect(Unit) {
         wirelessConnected = withContext(Dispatchers.IO) {
-            if (isWirelessDebuggingEnabled(context) && AppPreferences.wirelessAdbPaired(context)) {
-                runCatching { WirelessAdbManager.ensureConnected(context) }.getOrDefault(false)
-            } else {
-                isWirelessDebuggingEnabled(context) && WirelessAdbManager.isConnected(context)
-            }
+            WirelessAdbManager.refreshConnection(context, forceReconnect = true)
         }
     }
 
@@ -1091,11 +1091,7 @@ private fun SettingsPage(
             if (event == Lifecycle.Event.ON_RESUME) {
                 wirelessStatusScope.launch {
                     wirelessConnected = withContext(Dispatchers.IO) {
-                        if (isWirelessDebuggingEnabled(context) && AppPreferences.wirelessAdbPaired(context)) {
-                            runCatching { WirelessAdbManager.ensureConnected(context) }.getOrDefault(false)
-                        } else {
-                            isWirelessDebuggingEnabled(context) && WirelessAdbManager.isConnected(context)
-                        }
+                        WirelessAdbManager.refreshConnection(context, forceReconnect = true)
                     }
                     wirelessPaired = AppPreferences.wirelessAdbPaired(context)
                 }
@@ -1227,14 +1223,9 @@ private fun SettingsPage(
                         }
                         val paired = AppPreferences.wirelessAdbPaired(context)
                         val connected = withContext(Dispatchers.IO) {
-                            if (paired) {
-                                runCatching { WirelessAdbManager.ensureConnected(context) }.getOrDefault(false)
-                            } else {
-                                WirelessAdbManager.isConnected(context)
-                            }
+                            WirelessAdbManager.refreshConnection(context, forceReconnect = true)
                         }
                         wirelessConnected = connected
-                        AppPreferences.setWirelessAdbMode(context, connected)
                         wirelessPaired = AppPreferences.wirelessAdbPaired(context)
                         if (!connected) {
                             if (paired) {
@@ -1683,6 +1674,81 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                     }
                 }
                 Surface(
+                    onClick = { uriHandler.openUri(SUKI_SU_HOME_URL) },
+                    color = Color.Transparent,
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(Icons.Rounded.Security, contentDescription = null)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.sukisu_card_title),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                stringResource(R.string.sukisu_card_description),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(Icons.Rounded.Link, contentDescription = stringResource(R.string.open_github))
+                    }
+                }
+                Surface(
+                    onClick = { uriHandler.openUri(ROOT_MY_GALAXY_PAYLOADS_URL) },
+                    color = Color.Transparent,
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(painterResource(R.drawable.ic_github), contentDescription = null)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.payloads_card_title),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                stringResource(R.string.payloads_card_description),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(Icons.Rounded.Link, contentDescription = stringResource(R.string.open_github))
+                    }
+                }
+                Surface(
+                    onClick = { uriHandler.openUri(CVE_EXPLOIT_SOURCE_URL) },
+                    color = Color.Transparent,
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(painterResource(R.drawable.ic_github), contentDescription = null)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.exploit_source_card_title),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                stringResource(R.string.exploit_source_card_description),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(Icons.Rounded.Link, contentDescription = stringResource(R.string.open_github))
+                    }
+                }
+                Surface(
                     onClick = { uriHandler.openUri(ROOT_MY_GALAXY_URL) },
                     color = Color.Transparent,
                     shape = MaterialTheme.shapes.medium,
@@ -1903,7 +1969,7 @@ private fun SideChoiceMenu(
 
 private const val MENU_EXIT_ANIMATION_MILLIS = 180
 private const val MENU_EXIT_WAIT_MILLIS = 200L
-private const val ROOT_MY_GALAXY_URL = "https://gitee.com/lin0928/samsung-root"
+private const val ROOT_MY_GALAXY_URL = "https://github.com/BuSung-dev/Root-My-Galaxy"
 
 @Composable
 private fun languageLabel(tag: String): String = when {

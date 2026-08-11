@@ -70,7 +70,7 @@ class WirelessAdbPairingRequiredException(cause: Throwable? = null) :
     IOException("Wireless debugging needs to be paired once in Settings", cause)
 
 object WirelessAdbManager {
-    const val REMOTE_HELPER_PATH = "/data/local/tmp/cve-2026-43499-root"
+    const val REMOTE_HELPER_PATH = "/data/local/tmp/libcve43499root.so"
 
     private const val CONNECTION_TIMEOUT_MILLIS = 8_000L
     private const val PAIRING_DISCOVERY_TIMEOUT_MILLIS = 15_000L
@@ -80,6 +80,45 @@ object WirelessAdbManager {
 
     fun isConnected(context: Context): Boolean = runCatching {
         WirelessAdbConnectionManager.getInstance(context).isConnected
+    }.getOrDefault(false)
+
+    fun refreshConnection(
+        context: Context,
+        forceReconnect: Boolean = false,
+        allowUnpaired: Boolean = false,
+    ): Boolean = runCatching {
+        if (forceReconnect) {
+            synchronized(lock) {
+                runCatching {
+                    WirelessAdbConnectionManager.getInstance(context).disconnect()
+                }
+            }
+        }
+        val connected = if (isConnected(context)) {
+            true
+        } else if (allowUnpaired || AppPreferences.wirelessAdbPaired(context)) {
+            ensureConnected(context)
+        } else {
+            false
+        }
+        if (!connected) return@runCatching false
+
+        if (probeShell(context)) {
+            AppPreferences.setWirelessAdbPaired(context, true)
+            return@runCatching true
+        }
+
+        synchronized(lock) {
+            runCatching {
+                WirelessAdbConnectionManager.getInstance(context).disconnect()
+            }
+        }
+        val reconnected = if (allowUnpaired || AppPreferences.wirelessAdbPaired(context)) {
+            ensureConnected(context)
+        } else {
+            false
+        }
+        reconnected && probeShell(context)
     }.getOrDefault(false)
 
     @Throws(Exception::class)
@@ -126,13 +165,17 @@ object WirelessAdbManager {
     }
 
     @Throws(Exception::class)
-    fun runCommand(context: Context, command: String): WirelessAdbCommandResult {
+    fun runCommand(
+        context: Context,
+        command: String,
+        allowStreamClose: Boolean = false,
+    ): WirelessAdbCommandResult {
         require(ensureConnected(context)) {
             "Wireless debugging is not connected"
         }
         val script = commandScript(command)
         val stream = WirelessAdbConnectionManager.getInstance(context).openStream("shell:sh -c ${shellQuote(script)}")
-        return readCommandResult(stream)
+        return readCommandResult(stream, allowStreamClose)
     }
 
     @Throws(Exception::class)
@@ -170,6 +213,15 @@ object WirelessAdbManager {
         }
     }
 
+    private fun probeShell(context: Context): Boolean = runCatching {
+        val result = runCommand(
+            context,
+            "printf GLAXYSU_ADB_PROBE",
+            allowStreamClose = true,
+        )
+        result.code == 0 && result.output.contains("GLAXYSU_ADB_PROBE")
+    }.getOrDefault(false)
+
     private fun discoverPairingEndpoint(context: Context): PairingEndpoint {
         val latch = CountDownLatch(1)
         var endpoint: PairingEndpoint? = null
@@ -193,9 +245,20 @@ object WirelessAdbManager {
         }
     }
 
-    private fun readCommandResult(stream: AdbStream): WirelessAdbCommandResult {
+    private fun readCommandResult(
+        stream: AdbStream,
+        allowStreamClose: Boolean,
+    ): WirelessAdbCommandResult {
+        val captured = ByteArrayOutputStream()
         return try {
-            val output = stream.openInputStream().bufferedReader().use { it.readText() }
+            val input = stream.openInputStream()
+            val buffer = ByteArray(16 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count > 0) captured.write(buffer, 0, count)
+            }
+            val output = captured.toString(Charsets.UTF_8.name())
             val markerIndex = output.lastIndexOf(EXIT_MARKER)
             if (markerIndex < 0) {
                 WirelessAdbCommandResult(0, output.trim())
@@ -212,7 +275,21 @@ object WirelessAdbManager {
                 )
             }
         } catch (error: IOException) {
-            throw error
+            if (allowStreamClose && error.message?.contains("closed", ignoreCase = true) == true) {
+                val output = captured.toString(Charsets.UTF_8.name())
+                val markerIndex = output.lastIndexOf(EXIT_MARKER)
+                WirelessAdbCommandResult(
+                    code = if (markerIndex < 0) 0 else output.substring(markerIndex + EXIT_MARKER.length)
+                        .lineSequence()
+                        .firstOrNull()
+                        ?.trim()
+                        ?.toIntOrNull()
+                        ?: 0,
+                    output = if (markerIndex < 0) output.trim() else output.substring(0, markerIndex).trim(),
+                )
+            } else {
+                throw error
+            }
         } finally {
             runCatching { stream.close() }
         }
