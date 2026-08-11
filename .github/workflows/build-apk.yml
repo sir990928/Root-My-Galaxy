@@ -45,33 +45,26 @@ jobs:
           ./gradlew assembleRelease --no-daemon --stacktrace --no-configuration-cache
 
       - name: 自动签名APK
-        env:
-          STORE_PWD: ${{ secrets.STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PWD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          # 获取 build-tools 路径
-          BUILD_TOOLS=$ANDROID_HOME/build-tools/37.0.0
-          APKSIGNER=$BUILD_TOOLS/apksigner
+          APK=$(ls app/build/outputs/apk/release/*.apk)
           
-          # 获取 APK 文件
-          cd app/build/outputs/apk/release
-          APK=$(ls *.apk)
+          echo "=== 签名信息 ==="
+          echo "APK: $APK"
           
-          echo "Signing: $APK"
+          jarsigner \
+            -verbose \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            -keystore release.jks \
+            -storepass GalaxyS25@2026 \
+            -keypass GalaxyS25@2026 \
+            "$APK" \
+            release
           
-          # 签名
-          $APKSIGNER sign \
-            --ks $GITHUB_WORKSPACE/release.jks \
-            --ks-pass pass:$STORE_PWD \
-            --ks-key-alias $KEY_ALIAS \
-            --key-pass pass:$KEY_PWD \
-            $APK
+          echo "=== 验证签名 ==="
+          jarsigner -verify -verbose "$APK"
           
-          echo "APK signed successfully!"
-          
-          # 验证签名
-          $APKSIGNER verify $APK
+          echo "✅ 签名完成"
 
       - name: 上传成品APK
         uses: actions/upload-artifact@v4
