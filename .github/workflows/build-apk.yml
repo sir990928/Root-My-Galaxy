@@ -57,8 +57,9 @@ jobs:
           echo "Output APK: $SIGNED_APK"
           echo "APK exists: $(test -f "$APK" && echo yes || echo no)"
           echo "APK size: $(ls -lh "$APK" | awk '{print $5}')"
+          echo "Keystore alias: $KEY_ALIAS"
           
-          # 使用 jarsigner 签名（更稳定的选择）
+          # 使用 jarsigner 签名（别名放在最后）
           echo "Signing with jarsigner..."
           jarsigner -verbose \
             -sigalg SHA256withRSA \
@@ -68,7 +69,7 @@ jobs:
             -keypass $KEY_PWD \
             -signedjar "$SIGNED_APK" \
             "$APK" \
-            $KEY_ALIAS
+            "$KEY_ALIAS"
           
           echo "Verifying signature..."
           jarsigner -verify -verbose -certs "$SIGNED_APK"

@@ -49,30 +49,34 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PWD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          # 查找 build-tools
-          TOOLS=$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)
-          APKSIGNER=$ANDROID_HOME/build-tools/$TOOLS/apksigner
+          # 获取APK路径
+          APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          SIGNED_APK="app/build/outputs/apk/release/app-release.apk"
           
-          echo "Using apksigner: $APKSIGNER"
-          
-          # 获取APK的绝对路径
-          APK=$(realpath app/build/outputs/apk/release/*.apk)
-          
-          echo "Found APK: $APK"
+          echo "Input APK: $APK"
+          echo "Output APK: $SIGNED_APK"
           echo "APK exists: $(test -f "$APK" && echo yes || echo no)"
           echo "APK size: $(ls -lh "$APK" | awk '{print $5}')"
           
-          echo "Signing APK..."
+          # 使用 jarsigner 签名（更稳定的选择）
+          echo "Signing with jarsigner..."
+          jarsigner -verbose \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            -keystore release.jks \
+            -storepass $STORE_PWD \
+            -keypass $KEY_PWD \
+            -signedjar "$SIGNED_APK" \
+            "$APK" \
+            $KEY_ALIAS
           
-          # 执行签名（使用绝对路径）
-          $APKSIGNER sign \
-            --ks release.jks \
-            --ks-pass pass:$STORE_PWD \
-            --key-pass pass:$KEY_PWD \
-            --ks-key-alias $KEY_ALIAS \
-            "$APK"
+          echo "Verifying signature..."
+          jarsigner -verify -verbose -certs "$SIGNED_APK"
           
           echo "APK signed successfully!"
+          
+          # 删除未签名的APK
+          rm -f "$APK"
 
       - name: 上传已签名成品APK
         uses: actions/upload-artifact@v4
