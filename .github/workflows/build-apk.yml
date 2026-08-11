@@ -41,12 +41,6 @@ jobs:
       - name: 安装基础工具
         run: sudo apt update && sudo apt install -y zip unzip wget
 
-      - name: 清理预装安卓SDK
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo mkdir -p /usr/local/lib/android/sdk
-          sudo chown -R $USER:$USER /usr/local/lib/android
-
       - name: 安装 Android SDK
         uses: android-actions/setup-android@v3
 
