@@ -32,15 +32,6 @@ android {
         noCompress += ".arsc"
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = file(System.getenv("KEYSTORE_FILE") ?: "../release.jks")
-            storePassword = System.getenv("KEYSTORE_STORE_PASSWORD")
-            keyAlias = System.getenv("KEYSTORE_KEY_ALIAS")
-            keyPassword = System.getenv("KEYSTORE_KEY_PASSWORD")
-        }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -49,7 +40,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // 关键：不开启gradle自动签名，避免构建密码缺失报错，签名交给CI apksigner
             signingConfig = null
         }
     }
@@ -97,10 +87,10 @@ kotlin {
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
-            // 增加kotlin字节码优化
             "-Xno-param-assertions",
             "-Xno-call-assertions",
-            "-Xno-receiver-assertions"
+            "-Xno-receiver-assertions",
+            "-Xno-debug-metadata"
         )
     }
 }
@@ -118,7 +108,6 @@ dependencies {
     implementation("com.materialkolor:material-kolor:4.1.1")
     implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
     implementation("com.github.MuntashirAkon:sun-security-android:1.1")
-    // 体积大户：conscrypt-android 2MB原生库，想大幅缩包建议注释替换tink
     implementation("org.conscrypt:conscrypt-android:2.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 

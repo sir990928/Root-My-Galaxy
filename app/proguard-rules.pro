@@ -1,33 +1,42 @@
-# ========== Compose 保护（精简不冗余，避免膨胀） ==========
+# 全局R8深度优化
+-optimizationpasses 7
+-dontusemixedcaseclassnames
+-dontskipnonpubliclibraryclasses
+-dontskipnonpubliclibraryclassmembers
+-verbose
+# 激进裁剪冗余代码，保留基础类型转换逻辑
+-optimizations !code/simplification/cast,!field/*,!class/merging/*,!code/allocation/variable
+
+# Compose 轻量化保护，只保必要标识，其余全混淆压缩
 -keepnames class androidx.compose.**
-# 保留所有Composable函数，防止UI失效
+# 所有Composable UI函数必须保留，界面不会崩溃
 -keepclassmembers class * {
     @androidx.compose.runtime.Composable <methods>;
 }
-# 保留Stable稳定标记
+# Stable标记类，Compose重组逻辑依赖
 -keep @androidx.compose.runtime.Stable class *
 
-# 业务包仅保留类名，内部方法/字段全混淆裁剪，减少体积
+# 自身业务包仅保留类名，方法/字段全部混淆、无用代码自动删除
 -keepnames class com.glaxysu.root.**
 
-# ========== JNI Native 方法必保（防止so调用崩溃） ==========
+# JNI native 本地方法强制保留，防止调用so找不到符号
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# ========== Kotlin 协程精简保护 ==========
+# Kotlin协程最小保护范围，不锁住全部内部实现
 -keepnames class kotlinx.coroutines.**
 -keepclassmembers class ** {
     @kotlinx.coroutines.ExperimentalCoroutinesApi <methods>;
 }
 
-# ========== Conscrypt 加密库屏蔽无用警告 ==========
+# Conscrypt加密库屏蔽不存在的旧平台类警告，不影响编译
 -dontwarn com.android.org.conscrypt.**
 -dontwarn org.apache.harmony.xnet.provider.jsse.**
 -dontwarn org.conscrypt.KitKatPlatformOpenSSLSocketImplAdapter
 -dontwarn org.conscrypt.PreKitKatPlatformOpenSSLSocketImplAdapter
 
-# ========== 极致瘦身：彻底删除所有Log代码（取消注释启用，大幅减字节码） ==========
+# 彻底移除全部Log打印，字节码直接删除，有效减小包体积
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);
     public static int v(...);
@@ -37,16 +46,7 @@
     public static int e(...);
 }
 
-# ========== shrinkResources 资源压缩兼容规则 ==========
+# shrinkResources 资源压缩兼容，防止视图回调被误删
 -keepclassmembers class * {
     void *(android.view.View);
 }
-
-# ========== 全局R8优化配置（新增，强力瘦身） ==========
--optimizationpasses 7
--dontusemixedcaseclassnames
--dontskipnonpubliclibraryclasses
--dontskipnonpubliclibraryclassmembers
--verbose
-# 移除无用注解、空构造、无用get/set
--optimizations !code/simplification/cast,!field/*,!class/merging/*,!code/allocation/variable
