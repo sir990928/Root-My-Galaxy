@@ -6,10 +6,12 @@ on:
 
 env:
   TARGET: Galaxy-Su
-  RAW_APK: app/build/outputs/apk/release/app-release.apk
-  TEMP_DIR: temp_apk_work
-  UNSIGNED_TMP: temp-noalign.apk
-  ALIGNED_TMP: temp-aligned.apk
+  # 使用绝对路径，杜绝../相对路径出错
+  APK_DIR: ${{ github.workspace }}/app/build/outputs/apk/release
+  RAW_APK: ${{ github.workspace }}/app/build/outputs/apk/release/app-release.apk
+  TEMP_DIR: ${{ github.workspace }}/temp_apk_work
+  UNSIGNED_TMP: ${{ github.workspace }}/temp-noalign.apk
+  ALIGNED_TMP: ${{ github.workspace }}/temp-aligned.apk
 
 jobs:
   build:
@@ -27,40 +29,50 @@ jobs:
           distribution: temurin
           cache: gradle
 
-      # 第一步：先还原密钥文件，提前生成release.jks
-      - name: 还原签名密钥文件
+      # 提前还原密钥文件
+      - name: 还原签名密钥
         env:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > release.jks
 
-      - name: 安装全套工具链
+      # 安装工具
+      - name: 安装打包工具链
         run: sudo apt update && sudo apt install -y zip unzip binutils-aarch64-linux-gnu zipalign apksigner
 
       - name: 安装Android SDK
         uses: android-actions/setup-android@v3
 
-      # Gradle构建【未签名】包，不再校验签名密码，不会抛缺失异常
-      - name: Gradle构建无签名Release包
+      # Gradle 构建无签名包
+      - name: Gradle 编译Release
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      # 解压、删除旧签名、批量strip全部so（包含conscrypt）
-      - name: 批量压缩所有原生库
+      # 新增：校验APK是否生成，不存在直接终止流程
+      - name: 校验构建输出包
+        run: |
+          if [ ! -f ${{ env.RAW_APK }} ]; then
+            echo "错误：构建未生成app-release.apk"
+            exit 1
+          fi
+          ls -la ${{ env.APK_DIR }}
+
+      # 解压+strip全部so
+      - name: 批量压缩原生库
         run: |
           rm -rf ${{ env.TEMP_DIR }}
           mkdir ${{ env.TEMP_DIR }}
           cd ${{ env.TEMP_DIR }}
-          unzip -q ../${{ env.RAW_APK }}
+          unzip -q ${{ env.RAW_APK }}
           rm -rf META-INF
           aarch64-linux-gnu-strip --strip-all lib/arm64-v8a/*.so
-          zip -r -q -0 ../${{ env.UNSIGNED_TMP }} .
+          zip -r -q -0 ${{ env.UNSIGNED_TMP }} .
           cd ..
 
       # 4字节对齐
-      - name: Zipalign对齐
+      - name: Zipalign 对齐APK
         run: zipalign -p -f 4 ${{ env.UNSIGNED_TMP }} ${{ env.ALIGNED_TMP }}
 
-      # 统一apksigner签名，直接读取secrets，不再依赖gradle环境变量
-      - name: Apksigner 完整签名
+      # 签名
+      - name: Apksigner 签名成品包
         run: |
           apksigner sign \
             --ks release.jks \
@@ -71,10 +83,11 @@ jobs:
             ${{ env.ALIGNED_TMP }}
 
       # 清理临时文件
-      - name: 清理缓存文件
+      - name: 清理缓存
         run: rm -rf ${{ env.TEMP_DIR }} ${{ env.UNSIGNED_TMP }} ${{ env.ALIGNED_TMP }} release.jks
 
-      - name: 上传成品APK
+      # 上传成品
+      - name: 上传APK
         uses: actions/upload-artifact@v4
         with:
           name: App-${{ env.TARGET }}
