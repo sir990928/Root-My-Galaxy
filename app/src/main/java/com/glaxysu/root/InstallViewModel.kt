@@ -183,25 +183,13 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     require(helper.isFile && helper.canRead() && (wirelessExecution || helper.canExecute())) {
         app.getString(R.string.error_helper_unavailable)
     }
-    if (!wirelessExecution) {
-        try {
-            if (WirelessAdbManager.refreshConnection(app, forceReconnect = true)) {
-                wirelessExecution = true
-                appendLog("[*] Wireless detected, switching to wireless mode")
-            } else {
-                return
-            }
-        } catch (e: Exception) {
-            return
-        }
-    }
+    if (!wirelessExecution) return
     val result = WirelessAdbManager.stageFile(app, helper, WirelessAdbManager.REMOTE_HELPER_PATH)
     require(result.code == 0) {
         app.getString(R.string.error_wireless_adb_stage, helper.name, result.output)
     }
     appendLog(app.getString(R.string.log_wireless_adb_helper_staged))
 }
-
     private suspend fun executeExploit(payload: File) {
         if (!wirelessExecution) {
             executeLocalExploit(payload)
@@ -574,18 +562,21 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     private fun helperFile(): File = nativeHelperFile()
     private fun nativeHelperFile() = File(app.applicationInfo.nativeLibraryDir, "libcve43499root.so")
     private fun runHelper(vararg arguments: String): CommandResult {
-    // ✅ 实时判断无线是否可用
-    val actuallyWireless = try {
-        WirelessAdbManager.refreshConnection(app, forceReconnect = false)
-    } catch (e: Exception) {
+    // ✅ 每次执行都看开关
+    val wirelessExpected = isWirelessDebuggingEnabled() || AppPreferences.wirelessAdbPaired(app)
+    
+    val actuallyWireless = if (wirelessExpected) {
+        try {
+            WirelessAdbManager.refreshConnection(app, forceReconnect = false)
+        } catch (e: Exception) {
+            false
+        }
+    } else {
         false
     }
     
-    // ✅ 之前是本地，现在连上无线了，自动切换
-    if (actuallyWireless && !wirelessExecution) {
-        wirelessExecution = true
-        stageBootstrapHelper()
-    }
+    // ✅ 根据开关实时同步状态
+    wirelessExecution = actuallyWireless
     
     if (!actuallyWireless) {
         val helper = helperFile()
