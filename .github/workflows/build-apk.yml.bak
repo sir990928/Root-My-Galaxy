@@ -43,22 +43,22 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace --no-configuration-cache
 
-      - name: 自动签名APK（修复apksigner找不到，读取SDK完整路径）
+      - name: 自动签名APK
         env:
           STORE_PWD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PWD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          SDK_ROOT=$ANDROID_HOME
-          BUILD_TOOLS_VER=$(ls $SDK_ROOT/build-tools | sort -V | tail -1)
-          APKSIGNER_BIN="$SDK_ROOT/build-tools/$BUILD_TOOLS_VER/apksigner"
-          APK_FILE=$(ls app/build/outputs/apk/release/*.apk | head -1)
-          $APKSIGNER_BIN sign \
+          SDK=$ANDROID_HOME
+          TOOLS=$(ls $SDK/build-tools | sort -V | tail -1)
+          APKSIGNER=$SDK/build-tools/$TOOLS/apksigner
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          $APKSIGNER sign \
             --ks release.jks \
             --ks-pass pass:$STORE_PWD \
             --key-pass pass:$KEY_PWD \
             --ks-key-alias $KEY_ALIAS \
-            "$APK_FILE"
+            "$APK"
 
       - name: 上传已签名成品APK
         uses: actions/upload-artifact@v4
