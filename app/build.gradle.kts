@@ -26,6 +26,15 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("KEYSTORE_FILE") ?: "dummy.jks")
+            storePassword = System.getenv("KEYSTORE_STORE_PASSWORD")
+            keyAlias = System.getenv("KEYSTORE_KEY_ALIAS")
+            keyPassword = System.getenv("KEYSTORE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -33,6 +42,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

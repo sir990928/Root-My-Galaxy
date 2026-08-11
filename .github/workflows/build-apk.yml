@@ -32,6 +32,19 @@ jobs:
           distribution: temurin
           cache: gradle
 
+      - name: 还原签名keystore
+        env:
+          SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
+        run: |
+          echo "$SIGNING_KEYSTORE" | base64 -d > app/release.jks
+
+      - name: 赋值签名环境变量
+        run: |
+          echo "KEYSTORE_FILE=app/release.jks" >> $GITHUB_ENV
+          echo "KEYSTORE_STORE_PASSWORD=${{ secrets.SIGNING_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "KEYSTORE_KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> $GITHUB_ENV
+          echo "KEYSTORE_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> $GITHUB_ENV
+
       - name: 安装基础工具
         run: sudo apt update && sudo apt install -y zip unzip wget
 
