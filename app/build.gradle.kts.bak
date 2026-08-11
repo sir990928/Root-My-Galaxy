@@ -72,7 +72,6 @@ android {
                 "META-INF/*.kotlin_module",
                 "META-INF/LICENSE",
                 "META-INF/NOTICE",
-                "META-INF/conscrypt*",
                 "META-INF/*.md",
                 "META-INF/*.txt",
                 "**/test/**",
@@ -110,7 +109,6 @@ dependencies {
     implementation("com.materialkolor:material-kolor:4.1.1")
     implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
     implementation("com.github.MuntashirAkon:sun-security-android:1.1")
-    implementation("org.conscrypt:conscrypt-android:2.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

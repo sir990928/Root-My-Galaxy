@@ -89,3 +89,10 @@
     @android.webkit.JavascriptInterface <methods>;
     void *(android.view.View);
 }
+
+# ============ ADB 无线调试证书保留 ============
+-keep class android.sun.security.x509.** { *; }
+-keep class android.sun.security.provider.** { *; }
+
+# ============ 移除后量子加密 ============
+-dontwarn org.bouncycastle.pqc.**

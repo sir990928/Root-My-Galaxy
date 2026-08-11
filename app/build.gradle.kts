@@ -75,7 +75,8 @@ android {
                 "META-INF/*.md",
                 "META-INF/*.txt",
                 "**/test/**",
-                "**/androidTest/**"
+                "**/androidTest/**",
+                "**/bouncycastle/pqc/**"
             )
         }
     }
@@ -96,7 +97,6 @@ kotlin {
 }
 
 dependencies {
-    // 修复：替换不存在的2026.08.11为官方正式可用版本
     implementation(platform("androidx.compose:compose-bom:2026.01.00"))
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
