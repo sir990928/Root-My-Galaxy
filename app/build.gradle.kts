@@ -66,7 +66,7 @@ android {
     }
 
     packaging {
-        jniLibs.useLegacyPackaging = false
+        jniLibs.useLegacyPackaging = true
         resources {
             excludes += listOf(
                 "META-INF/*.kotlin_module",
