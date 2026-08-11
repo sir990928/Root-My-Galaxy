@@ -27,17 +27,11 @@ jobs:
           distribution: temurin
           cache: gradle
 
-      - name: 还原签名密钥
+      # 第一步：先还原密钥文件，提前生成release.jks
+      - name: 还原签名密钥文件
         env:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > release.jks
-
-      - name: 注入密钥环境变量
-        run: |
-          echo "KEYSTORE_FILE=../release.jks" >> $GITHUB_ENV
-          echo "STORE_PWD=${{ secrets.SIGNING_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-          echo "KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> $GITHUB_ENV
-          echo "KEY_PWD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> $GITHUB_ENV
 
       - name: 安装全套工具链
         run: sudo apt update && sudo apt install -y zip unzip binutils-aarch64-linux-gnu zipalign apksigner
@@ -45,11 +39,11 @@ jobs:
       - name: 安装Android SDK
         uses: android-actions/setup-android@v3
 
-      # 1. Gradle原生编译打包
-      - name: Gradle构建Release包
+      # Gradle构建【未签名】包，不再校验签名密码，不会抛缺失异常
+      - name: Gradle构建无签名Release包
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      # 2. 解压APK、删除旧签名、批量strip全部so（包含远程libconscrypt_jni.so）
+      # 解压、删除旧签名、批量strip全部so（包含conscrypt）
       - name: 批量压缩所有原生库
         run: |
           rm -rf ${{ env.TEMP_DIR }}
@@ -58,22 +52,21 @@ jobs:
           unzip -q ../${{ env.RAW_APK }}
           rm -rf META-INF
           aarch64-linux-gnu-strip --strip-all lib/arm64-v8a/*.so
-          # -0 参数强制resources.arsc不压缩，匹配aapt配置，解决-124报错
           zip -r -q -0 ../${{ env.UNSIGNED_TMP }} .
           cd ..
 
-      # 3. 4字节标准对齐（签名前必须执行）
+      # 4字节对齐
       - name: Zipalign对齐
         run: zipalign -p -f 4 ${{ env.UNSIGNED_TMP }} ${{ env.ALIGNED_TMP }}
 
-      # 4. 完整重签名，产出可正常安装成品
-      - name: Apksigner重签
+      # 统一apksigner签名，直接读取secrets，不再依赖gradle环境变量
+      - name: Apksigner 完整签名
         run: |
           apksigner sign \
             --ks release.jks \
-            --ks-pass pass:${{ env.STORE_PWD }} \
-            --key-pass pass:${{ env.KEY_PWD }} \
-            --ks-key-alias ${{ env.KEY_ALIAS }} \
+            --ks-pass pass:${{ secrets.SIGNING_KEYSTORE_PASSWORD }} \
+            --key-pass pass:${{ secrets.SIGNING_KEY_PASSWORD }} \
+            --ks-key-alias ${{ secrets.SIGNING_KEY_ALIAS }} \
             --out ${{ env.RAW_APK }} \
             ${{ env.ALIGNED_TMP }}
 
