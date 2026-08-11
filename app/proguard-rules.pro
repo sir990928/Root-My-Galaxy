@@ -1,42 +1,81 @@
-# 全局R8深度优化
--optimizationpasses 7
+# ============ 极致压缩优化 ============
+
+# 多次优化迭代
+-optimizationpasses 10
+
+# 启用代码压缩、混淆、优化
 -dontusemixedcaseclassnames
 -dontskipnonpubliclibraryclasses
 -dontskipnonpubliclibraryclassmembers
 -verbose
-# 激进裁剪冗余代码，保留基础类型转换逻辑
--optimizations !code/simplification/cast,!field/*,!class/merging/*,!code/allocation/variable
 
-# Compose 轻量化保护，只保必要标识，其余全混淆压缩
+# 激进优化（移除所有安全限制）
+-optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*,!code/allocation/variable
+
+# 合并所有能合并的类和接口
+-allowaccessmodification
+-mergeinterfacesaggressively
+-overloadaggressively
+
+# 更短的类和成员名
+-repackageclasses ''
+-useuniqueclassmembernames
+
+# 移除所有未使用的类和成员
+-dontshrink false
+-dontoptimize false
+-dontobfuscate false
+
+# 移除所有行号和源文件信息，二进制不可调试
+-renamesourcefileattribute ''
+-keepattributes Exceptions,InnerClasses,Signature,Deprecated,EnclosingMethod,*Annotations*
+
+# ============ Compose 最小保护 ============
 -keepnames class androidx.compose.**
-# 所有Composable UI函数必须保留，界面不会崩溃
 -keepclassmembers class * {
     @androidx.compose.runtime.Composable <methods>;
 }
-# Stable标记类，Compose重组逻辑依赖
 -keep @androidx.compose.runtime.Stable class *
+-keep @androidx.compose.runtime.Immutable class *
 
-# 自身业务包仅保留类名，方法/字段全部混淆、无用代码自动删除
--keepnames class com.glaxysu.root.**
+# ============ 业务代码全混淆 ============
+# 不保留类名，所有都可重命名
+-keep class com.glaxysu.root.** {
+    public protected *;
+}
 
-# JNI native 本地方法强制保留，防止调用so找不到符号
+# ============ JNI 最小保留 ============
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# Kotlin协程最小保护范围，不锁住全部内部实现
--keepnames class kotlinx.coroutines.**
+# ============ Kotlin 协程最小化 ============
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
 -keepclassmembers class ** {
     @kotlinx.coroutines.ExperimentalCoroutinesApi <methods>;
 }
 
-# Conscrypt加密库屏蔽不存在的旧平台类警告，不影响编译
+# ============ 反射/序列化保护 ============
+# Gson/FastJson 实体类（如果有）
+-keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
+# Parcelable
+-keepclassmembers class * implements android.os.Parcelable {
+    public static final android.os.Parcelable$Creator CREATOR;
+}
+
+# ============ 去掉无用警告 ============
 -dontwarn com.android.org.conscrypt.**
 -dontwarn org.apache.harmony.xnet.provider.jsse.**
--dontwarn org.conscrypt.KitKatPlatformOpenSSLSocketImplAdapter
--dontwarn org.conscrypt.PreKitKatPlatformOpenSSLSocketImplAdapter
+-dontwarn org.conscrypt.**
+-dontwarn javax.annotation.**
+-dontwarn javax.inject.**
+-dontwarn sun.misc.**
 
-# 彻底移除全部Log打印，字节码直接删除，有效减小包体积
+# ============ 完全移除 Log ============
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);
     public static int v(...);
@@ -44,9 +83,18 @@
     public static int i(...);
     public static int w(...);
     public static int e(...);
+    public static int wtf(...);
 }
 
-# shrinkResources 资源压缩兼容，防止视图回调被误删
+# 移除 assert 语句
+-assumenosideeffects class kotlin.jvm.internal.Intrinsics {
+    static void checkNotNullParameter(...);
+    static void checkExpressionValueIsNotNull(...);
+    static void checkNotNull(...);
+}
+
+# ============ 资源保护 ============
 -keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
     void *(android.view.View);
 }

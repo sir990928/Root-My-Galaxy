@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  TARGET: pa3q-S9380ZHU1AYA1
+  TARGET: Samsung-root
 
 jobs:
   build:
