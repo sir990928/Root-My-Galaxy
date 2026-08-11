@@ -29,6 +29,11 @@ android {
         }
     }
 
+    // 新增：强制arsc资源不压缩，匹配流水线zip -0参数，彻底杜绝-124解析失败
+    aaptOptions {
+        noCompress += ".arsc"
+    }
+
     signingConfigs {
         create("release") {
             // 修正兜底路径，向上一层读取根目录的release.jks
