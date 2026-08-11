@@ -3,9 +3,8 @@ name: 仅构建 S9380ZHU1AYA1 APK（自动签名，不编译漏洞so）
 on:
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/build-apk.yml"
-  workflow_dispatch:
+   workflow_dispatch:
+
 
 env:
   TARGET: pa3q-S9380ZHU1AYA1

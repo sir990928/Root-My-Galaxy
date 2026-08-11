@@ -30,25 +30,22 @@ jobs:
       - name: 安装基础工具
         run: sudo apt update && sudo apt install -y zip unzip wget
 
-      # 官方Action自动配置SDK、build-tools，自带全局apksigner
       - name: 安装 Android SDK & BuildTools
         uses: android-actions/setup-android@v3
         with:
           accept-licenses: true
 
-      # 还原签名密钥文件
-      - name: 还原签名密钥
+      - name: 还原签名密钥文件
         env:
           KS_BASE64: ${{ secrets.SIGNING_KEYSTORE }}
         run: echo "$KS_BASE64" | base64 -d > release.jks
 
-      - name: 编译未签名Release包
+      - name: 编译Release包（关闭配置缓存解决native lib序列化报错）
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --stacktrace --no-configuration-cache
 
-      # apksigner自动签名
-      - name: APK自动签名
+      - name: 自动签名APK
         env:
           STORE_PWD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -62,7 +59,7 @@ jobs:
             --ks-key-alias $KEY_ALIAS \
             "$APK"
 
-      - name: 上传已签名APK
+      - name: 上传已签名成品APK
         uses: actions/upload-artifact@v4
         with:
           name: Signed-App-${{ env.TARGET }}
@@ -70,7 +67,6 @@ jobs:
           if-no-files-found: error
           path: app/build/outputs/apk/release/*.apk
 
-      # 永久清理密钥文件
-      - name: 删除密钥文件
+      - name: 清理密钥文件
         if: always()
         run: rm -f release.jks
