@@ -28,7 +28,8 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file(System.getenv("KEYSTORE_FILE") ?: "release.jks")
+            // 修正兜底路径，向上一层读取根目录的release.jks
+            storeFile = file(System.getenv("KEYSTORE_FILE") ?: "../release.jks")
             storePassword = System.getenv("KEYSTORE_STORE_PASSWORD")
             keyAlias = System.getenv("KEYSTORE_KEY_ALIAS")
             keyPassword = System.getenv("KEYSTORE_KEY_PASSWORD")
