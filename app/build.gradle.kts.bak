@@ -22,6 +22,9 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += "-DANDROID_STL=none"
+                // 全局关闭所有调试符号
+                cFlags += "-g0"
+                cppFlags += "-g0"
             }
         }
     }

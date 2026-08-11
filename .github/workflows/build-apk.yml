@@ -1,5 +1,4 @@
-name: 仅构建 S9380ZHU1AYA1 APK（不编译漏洞so）
-
+name: Galaxy-Su 自动瘦身构建
 on:
   push:
     branches: [main]
@@ -7,61 +6,84 @@ on:
 
 env:
   TARGET: Galaxy-Su
+  RAW_APK: app/build/outputs/apk/release/app-release.apk
+  TEMP_DIR: temp_apk_work
+  UNSIGNED_TMP: temp-noalign.apk
+  ALIGNED_TMP: temp-aligned.apk
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: 拉取源码
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: 配置 JDK 21
+      - name: 配置JDK21
         uses: actions/setup-java@v4
         with:
           java-version: "21"
           distribution: temurin
           cache: gradle
 
-      - name: 还原签名keystore
+      - name: 还原签名密钥
         env:
-          SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
-        run: |
-          echo "$SIGNING_KEYSTORE" | base64 -d > release.jks
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE }}
+        run: echo "$KEYSTORE_BASE64" | base64 -d > release.jks
 
-      - name: 赋值签名环境变量
+      - name: 注入密钥环境变量
         run: |
           echo "KEYSTORE_FILE=../release.jks" >> $GITHUB_ENV
-          echo "KEYSTORE_STORE_PASSWORD=${{ secrets.SIGNING_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-          echo "KEYSTORE_KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> $GITHUB_ENV
-          echo "KEYSTORE_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> $GITHUB_ENV
+          echo "STORE_PWD=${{ secrets.SIGNING_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> $GITHUB_ENV
+          echo "KEY_PWD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> $GITHUB_ENV
 
-      - name: 安装基础工具 + aarch64 strip
-        run: sudo apt update && sudo apt install -y zip unzip wget binutils-aarch64-linux-gnu
+      - name: 安装全套工具链
+        run: sudo apt update && sudo apt install -y zip unzip binutils-aarch64-linux-gnu zipalign apksigner
 
-      - name: 安装 Android SDK
+      - name: 安装Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 打包Release APK（自动签名）
+      # 1. Gradle原生编译打包
+      - name: Gradle构建Release包
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      # 解压APK，批量压缩全部so，包含conscrypt
-      - name: 全局剥离所有原生库调试符号
+      # 2. 解压APK、删除旧签名、批量strip全部so（包含远程libconscrypt_jni.so）
+      - name: 批量压缩所有原生库
         run: |
-          mkdir -p temp_apk
-          cd temp_apk
-          unzip -q ../app/build/outputs/apk/release/app-release.apk
+          rm -rf ${{ env.TEMP_DIR }}
+          mkdir ${{ env.TEMP_DIR }}
+          cd ${{ env.TEMP_DIR }}
+          unzip -q ../${{ env.RAW_APK }}
+          rm -rf META-INF
           aarch64-linux-gnu-strip --strip-all lib/arm64-v8a/*.so
-          zip -r -q ../app/build/outputs/apk/release/app-release-min.apk .
+          # -0 参数强制resources.arsc不压缩，匹配aapt配置，解决-124报错
+          zip -r -q -0 ../${{ env.UNSIGNED_TMP }} .
           cd ..
-          mv app/build/outputs/apk/release/app-release-min.apk app/build/outputs/apk/release/app-release.apk
+
+      # 3. 4字节标准对齐（签名前必须执行）
+      - name: Zipalign对齐
+        run: zipalign -p -f 4 ${{ env.UNSIGNED_TMP }} ${{ env.ALIGNED_TMP }}
+
+      # 4. 完整重签名，产出可正常安装成品
+      - name: Apksigner重签
+        run: |
+          apksigner sign \
+            --ks release.jks \
+            --ks-pass pass:${{ env.STORE_PWD }} \
+            --key-pass pass:${{ env.KEY_PWD }} \
+            --ks-key-alias ${{ env.KEY_ALIAS }} \
+            --out ${{ env.RAW_APK }} \
+            ${{ env.ALIGNED_TMP }}
+
+      # 清理临时文件
+      - name: 清理缓存文件
+        run: rm -rf ${{ env.TEMP_DIR }} ${{ env.UNSIGNED_TMP }} ${{ env.ALIGNED_TMP }} release.jks
 
       - name: 上传成品APK
         uses: actions/upload-artifact@v4
         with:
           name: App-${{ env.TARGET }}
           retention-days: 30
-          if-no-files-found: error
-          path: app/build/outputs/apk/release/*.apk
+          path: ${{ env.RAW_APK }}
