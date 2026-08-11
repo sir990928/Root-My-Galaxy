@@ -43,58 +43,23 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace --no-configuration-cache
 
-      - name: 调试 - 检查构建输出
-        run: |
-          echo "ANDROID_HOME: $ANDROID_HOME"
-          echo "APK files found:"
-          find app/build/outputs/apk/release/ -name "*.apk" 2>/dev/null || echo "No APK found in default path"
-          find . -name "*.apk" 2>/dev/null || echo "No APK found anywhere"
-
       - name: 自动签名APK
         env:
           STORE_PWD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PWD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          # 设置 ANDROID_HOME（如果未设置）
-          if [ -z "$ANDROID_HOME" ]; then
-            export ANDROID_HOME=$HOME/android-sdk
-            echo "Setting ANDROID_HOME to $ANDROID_HOME"
-          fi
-          
-          # 查找最新的 build-tools
+          # 查找 build-tools
           TOOLS=$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)
           APKSIGNER=$ANDROID_HOME/build-tools/$TOOLS/apksigner
           
           echo "Using apksigner: $APKSIGNER"
           
-          # 确保 apksigner 可执行
-          if [ ! -f "$APKSIGNER" ]; then
-            echo "apksigner not found, trying alternative path..."
-            APKSIGNER=$(find $ANDROID_HOME -name "apksigner" -type f | head -1)
-          fi
+          # 直接使用通配符获取唯一的APK
+          APK=$(ls app/build/outputs/apk/release/*.apk)
           
-          if [ -z "$APKSIGNER" ] || [ ! -f "$APKSIGNER" ]; then
-            echo "Error: apksigner not found"
-            exit 1
-          fi
-          
-          # 查找 APK 文件
-          APK=$(find app/build/outputs/apk/release/ -name "*.apk" -not -name "*unsigned*" | head -1)
-          
-          if [ -z "$APK" ]; then
-            echo "No APK found in app/build/outputs/apk/release/"
-            echo "Searching for APK files..."
-            APK=$(find . -name "*.apk" -not -name "*unsigned*" -not -path "*/intermediates/*" | head -1)
-          fi
-          
-          if [ -z "$APK" ]; then
-            echo "Error: No APK file found"
-            find . -name "*.apk" 2>/dev/null
-            exit 1
-          fi
-          
-          echo "Signing APK: $APK"
+          echo "Found APK: $APK"
+          echo "Signing APK..."
           
           # 执行签名
           $APKSIGNER sign \
@@ -104,17 +69,15 @@ jobs:
             --ks-key-alias $KEY_ALIAS \
             "$APK"
           
-          echo "APK signed successfully"
+          echo "APK signed successfully!"
 
       - name: 上传已签名成品APK
         uses: actions/upload-artifact@v4
         with:
           name: Signed-App-${{ env.TARGET }}
           retention-days: 30
-          if-no-files-found: warn
-          path: |
-            app/build/outputs/apk/release/*.apk
-            **/*.apk
+          if-no-files-found: error
+          path: app/build/outputs/apk/release/*.apk
 
       - name: 清理密钥文件
         if: always()

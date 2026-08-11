@@ -55,13 +55,16 @@ jobs:
           
           echo "Using apksigner: $APKSIGNER"
           
-          # 直接使用通配符获取唯一的APK
-          APK=$(ls app/build/outputs/apk/release/*.apk)
+          # 获取APK的绝对路径
+          APK=$(realpath app/build/outputs/apk/release/*.apk)
           
           echo "Found APK: $APK"
+          echo "APK exists: $(test -f "$APK" && echo yes || echo no)"
+          echo "APK size: $(ls -lh "$APK" | awk '{print $5}')"
+          
           echo "Signing APK..."
           
-          # 执行签名
+          # 执行签名（使用绝对路径）
           $APKSIGNER sign \
             --ks release.jks \
             --ks-pass pass:$STORE_PWD \
