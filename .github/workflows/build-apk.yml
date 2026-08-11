@@ -25,20 +25,21 @@ jobs:
           distribution: temurin
           cache: gradle
 
+      - name: 还原签名keystore
+        env:
+          SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
+        run: |
+          echo "$SIGNING_KEYSTORE" | base64 -d > release.jks
+
       - name: 安装基础工具
         run: sudo apt update && sudo apt install -y zip unzip wget
 
-      - name: 安装 Android SDK & BuildTools
+      - name: 安装 Android SDK
         uses: android-actions/setup-android@v3
         with:
           accept-licenses: true
 
-      - name: 还原签名密钥文件
-        env:
-          KS_BASE64: ${{ secrets.SIGNING_KEYSTORE }}
-        run: echo "$KS_BASE64" | base64 -d > release.jks
-
-      - name: 编译Release包（关闭配置缓存解决native lib序列化报错）
+      - name: 打包Release APK
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace --no-configuration-cache
@@ -49,37 +50,30 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PWD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          # 获取APK路径
-          APK="app/build/outputs/apk/release/app-release-unsigned.apk"
-          SIGNED_APK="app/build/outputs/apk/release/app-release.apk"
+          # 获取 build-tools 路径
+          BUILD_TOOLS=$ANDROID_HOME/build-tools/37.0.0
+          APKSIGNER=$BUILD_TOOLS/apksigner
           
-          echo "Input APK: $APK"
-          echo "Output APK: $SIGNED_APK"
-          echo "APK exists: $(test -f "$APK" && echo yes || echo no)"
-          echo "APK size: $(ls -lh "$APK" | awk '{print $5}')"
-          echo "Keystore alias: $KEY_ALIAS"
+          # 获取 APK 文件
+          cd app/build/outputs/apk/release
+          APK=$(ls *.apk)
           
-          # 使用 jarsigner 签名（别名放在最后）
-          echo "Signing with jarsigner..."
-          jarsigner -verbose \
-            -sigalg SHA256withRSA \
-            -digestalg SHA-256 \
-            -keystore release.jks \
-            -storepass $STORE_PWD \
-            -keypass $KEY_PWD \
-            -signedjar "$SIGNED_APK" \
-            "$APK" \
-            "$KEY_ALIAS"
+          echo "Signing: $APK"
           
-          echo "Verifying signature..."
-          jarsigner -verify -verbose -certs "$SIGNED_APK"
+          # 签名
+          $APKSIGNER sign \
+            --ks $GITHUB_WORKSPACE/release.jks \
+            --ks-pass pass:$STORE_PWD \
+            --ks-key-alias $KEY_ALIAS \
+            --key-pass pass:$KEY_PWD \
+            $APK
           
           echo "APK signed successfully!"
           
-          # 删除未签名的APK
-          rm -f "$APK"
+          # 验证签名
+          $APKSIGNER verify $APK
 
-      - name: 上传已签名成品APK
+      - name: 上传成品APK
         uses: actions/upload-artifact@v4
         with:
           name: Signed-App-${{ env.TARGET }}
