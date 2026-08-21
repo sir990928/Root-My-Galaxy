@@ -210,10 +210,6 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         val exploitCommand = buildString {
             append("cd ${shellQuote(TMP_PATH)} && ")
             append("EXPLOIT_ATTEMPTS=${shellQuote(EXPLOIT_ATTEMPTS)} ")
-            append("PSELECT_DELAY_USEC=1000 ")
-            append("P0_ATTEMPT_TIMEOUT_SEC=45 ")
-            append("EXPLOIT_ATTEMPT_TIMEOUT_SEC=120 ")
-            append("CVE43499_ROOT_HELPER=${shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH)} ")
             append("LD_PRELOAD=${shellQuote(remotePayload)} ")
             append("/system/bin/true")
         }
