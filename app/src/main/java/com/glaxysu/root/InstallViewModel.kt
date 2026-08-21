@@ -179,14 +179,6 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         require(result.code == 0) {
             app.getString(R.string.error_wireless_adb_stage, helper.name, result.output)
         }
-        // 远端 helper 补执行权限
-        val chmodResult = WirelessAdbManager.runCommand(
-            app,
-            "chmod 755 ${shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH)}",
-        )
-        require(chmodResult.code == 0) {
-            app.getString(R.string.error_wireless_adb_stage, "chmod helper", chmodResult.output)
-        }
         appendLog(app.getString(R.string.log_wireless_adb_helper_staged))
     }
 
@@ -457,22 +449,15 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
 
     private fun stageToTmp(source: File, name: String): CommandResult {
         val target = "$TMP_PATH/$name"
-        val mode = if (name.endsWith(".ko")) "644" else "755"
         if (!wirelessExecution) {
+            val mode = if (name.endsWith(".ko")) "644" else "755"
             return runHelper(
                 "-c",
                 "cat ${shellQuote(source.absolutePath)} > ${shellQuote(target)} && chmod $mode ${shellQuote(target)}",
             )
         }
         val result = WirelessAdbManager.stageFile(app, source, target)
-        if (result.code != 0) {
-            return CommandResult(result.code, result.output)
-        }
-        val chmodResult = WirelessAdbManager.runCommand(
-            app,
-            "chmod $mode ${shellQuote(target)}",
-        )
-        return CommandResult(chmodResult.code, chmodResult.output)
+        return CommandResult(result.code, result.output)
     }
 
     private fun lateLoadCommand(ksudPath: String, ephemeral: Boolean): String {
