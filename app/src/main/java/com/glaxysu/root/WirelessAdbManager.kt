@@ -327,7 +327,17 @@ object WirelessAdbManager {
             val modifiedSeconds = (source.lastModified() / 1_000L).toInt()
             sendSyncHeader(output, "DONE", modifiedSeconds)
             output.flush()
-            readSyncResponse(input)
+            val syncResult = readSyncResponse(input)
+            if (syncResult.code != 0) {
+                return@try syncResult
+            }
+
+            // 文件推送完成后，在关闭 sync 流之前补一次 chmod，
+            // 确保远端 helper / ksud / exploit 真正拿到目标权限
+            runCatching { stream.close() }
+            val chmodStream = WirelessAdbConnectionManager.getInstance(context)
+                .openStream("shell:chmod $mode ${shellQuote(remotePath)}")
+            readCommandResult(chmodStream, allowStreamClose = false)
         } finally {
             runCatching { stream.close() }
         }
