@@ -143,24 +143,24 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private suspend fun selectExecutionMode() {
-        val wirelessExpected = isWirelessDebuggingEnabled() ||
-            AppPreferences.wirelessAdbPaired(app)
-
-        if (!wirelessExpected) {
-            wirelessExecution = false
-            appendLog("[*] 无线开关关闭，强制本地模式")
-            return
-        }
-
-        try {
-            WirelessAdbManager.ensureConnected(app)
-            wirelessExecution = true
-            appendLog("[*] 无线开关已开，强制无线模式")
-        } catch (e: Exception) {
-            wirelessExecution = false
-            appendLog("[-] 无线连接失败，降级本地: ${e.message}")
-        }
+    val wirelessExpected = isWirelessDebuggingEnabled() ||
+        AppPreferences.wirelessAdbPaired(app)
+    
+    if (!wirelessExpected) {
+        wirelessExecution = false
+        appendLog("[*] 无线开关关闭，强制本地模式")
+        return
     }
+
+    try {
+        WirelessAdbManager.ensureConnected(app)
+        wirelessExecution = true
+        appendLog("[*] 无线开关已开，强制无线模式")
+    } catch (e: Exception) {
+        wirelessExecution = false
+        appendLog("[-] 无线连接失败，降级本地: ${e.message}")
+    }
+}
 
     private fun isWirelessDebuggingEnabled(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
@@ -169,31 +169,17 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         }.getOrDefault(false)
     }
 
-    private fun ensureLocalHelperExecutable(helper: File) {
-        if (!helper.canExecute()) {
-            helper.setExecutable(true, false)
-        }
-        require(helper.isFile && helper.canExecute()) {
-            app.getString(R.string.error_helper_unavailable)
-        }
-    }
-
     private fun stageBootstrapHelper() {
         val helper = helperFile()
-        require(helper.isFile && helper.canRead()) {
+        require(helper.isFile && helper.canRead() && (wirelessExecution || helper.canExecute())) {
             app.getString(R.string.error_helper_unavailable)
         }
-
-        if (!wirelessExecution) {
-            ensureLocalHelperExecutable(helper)
-            return
-        }
-
+        if (!wirelessExecution) return
         val result = WirelessAdbManager.stageFile(app, helper, WirelessAdbManager.REMOTE_HELPER_PATH)
         require(result.code == 0) {
             app.getString(R.string.error_wireless_adb_stage, helper.name, result.output)
         }
-
+        // 远端 helper 补执行权限
         val chmodResult = WirelessAdbManager.runCommand(
             app,
             "chmod 755 ${shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH)}",
@@ -201,29 +187,27 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         require(chmodResult.code == 0) {
             app.getString(R.string.error_wireless_adb_stage, "chmod helper", chmodResult.output)
         }
-        appendLog("[+] 远端 helper 已 chmod 755")
-
         appendLog(app.getString(R.string.log_wireless_adb_helper_staged))
     }
 
     private suspend fun executeExploit(payload: File) {
-        if (isWirelessDebuggingEnabled() || AppPreferences.wirelessAdbPaired(app)) {
-            try {
-                WirelessAdbManager.ensureConnected(app)
-                wirelessExecution = true
-            } catch (e: Exception) {
-                wirelessExecution = false
-            }
-        } else {
+    if (isWirelessDebuggingEnabled() || AppPreferences.wirelessAdbPaired(app)) {
+        try {
+            WirelessAdbManager.ensureConnected(app)
+            wirelessExecution = true
+        } catch (e: Exception) {
             wirelessExecution = false
         }
+    } else {
+        wirelessExecution = false
+    }
+    
+    if (!wirelessExecution) {
+        executeLocalExploit(payload)
+        return
+    }
 
-        if (!wirelessExecution) {
-            executeLocalExploit(payload)
-            return
-        }
-
-        appendLog(app.getString(R.string.log_execution_path_wireless))
+    appendLog(app.getString(R.string.log_execution_path_wireless))
         val remotePayload = "$TMP_PATH/${payload.name}"
         val stagedPayload = stageToTmp(payload, payload.name)
         require(stagedPayload.code == 0) {
@@ -295,7 +279,9 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         val logFile = File(app.filesDir, "exploit.log")
         logFile.delete()
         val helper = helperFile()
-        ensureLocalHelperExecutable(helper)
+        require(helper.isFile && helper.canExecute()) {
+            app.getString(R.string.error_helper_unavailable)
+        }
 
         val process = ProcessBuilder(
             helper.absolutePath,
@@ -593,52 +579,52 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
 
     private fun helperFile(): File = nativeHelperFile()
     private fun nativeHelperFile() = File(app.applicationInfo.nativeLibraryDir, "libcve43499root.so")
-
     private fun runHelper(vararg arguments: String): CommandResult {
-        val wirelessExpected = isWirelessDebuggingEnabled() || AppPreferences.wirelessAdbPaired(app)
-
-        val actuallyWireless = if (wirelessExpected) {
-            try {
-                WirelessAdbManager.refreshConnection(app, forceReconnect = false)
-            } catch (e: Exception) {
-                false
-            }
-        } else {
+    val wirelessExpected = isWirelessDebuggingEnabled() || AppPreferences.wirelessAdbPaired(app)
+    
+    val actuallyWireless = if (wirelessExpected) {
+        try {
+            WirelessAdbManager.refreshConnection(app, forceReconnect = false)
+        } catch (e: Exception) {
             false
         }
-
-        wirelessExecution = actuallyWireless
-
-        if (!actuallyWireless) {
-            val helper = helperFile()
-            ensureLocalHelperExecutable(helper)
-            val process = ProcessBuilder(listOf(helper.absolutePath) + arguments)
-                .redirectErrorStream(true)
-                .start()
-            val output = readProcessOutput(process)
-            return CommandResult(process.waitFor(), stripAnsi(output.trim()))
+    } else {
+        false
+    }
+    
+    wirelessExecution = actuallyWireless
+    
+    if (!actuallyWireless) {
+        val helper = helperFile()
+        require(helper.isFile && helper.canExecute()) {
+            app.getString(R.string.error_helper_unavailable)
         }
-
-        val command = buildString {
-            append(shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH))
-            arguments.forEach {
-                append(' ')
-                append(shellQuote(it))
-            }
-        }
-        val result = WirelessAdbManager.runCommand(
-            app,
-            command,
-            allowStreamClose = arguments.any {
-                it == "id" ||
-                    it.contains("late-load") ||
-                    it.contains("/dev/sukisu.ko") ||
-                    it.contains("logcat insmod /dev/sukisu.ko")
-            },
-        )
-        return CommandResult(result.code, stripAnsi(result.output.trim()))
+        val process = ProcessBuilder(listOf(helper.absolutePath) + arguments)
+            .redirectErrorStream(true)
+            .start()
+        val output = readProcessOutput(process)
+        return CommandResult(process.waitFor(), stripAnsi(output.trim()))
     }
 
+    val command = buildString {
+        append(shellQuote(WirelessAdbManager.REMOTE_HELPER_PATH))
+        arguments.forEach {
+            append(' ')
+            append(shellQuote(it))
+        }
+    }
+    val result = WirelessAdbManager.runCommand(
+        app,
+        command,
+        allowStreamClose = arguments.any {
+            it == "id" ||
+                it.contains("late-load") ||
+                it.contains("/dev/sukisu.ko") ||
+                it.contains("logcat insmod /dev/sukisu.ko")
+        },
+    )
+    return CommandResult(result.code, stripAnsi(result.output.trim()))
+}
     private fun shellQuote(value: String) = "'${value.replace("'", "'\\''")}'"
     private fun isStreamClosed(error: Throwable): Boolean =
         generateSequence(error) { it.cause }
