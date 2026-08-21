@@ -305,12 +305,10 @@ object WirelessAdbManager {
         remotePath: String,
         mode: String,
     ): WirelessAdbCommandResult {
-        val manager = WirelessAdbConnectionManager.getInstance(context)
-        val syncStream = manager.openStream(LocalServices.SYNC)
-        val input = syncStream.openInputStream()
-        val output = syncStream.openOutputStream()
-
-        try {
+        val stream = WirelessAdbConnectionManager.getInstance(context).openStream(LocalServices.SYNC)
+        val input = stream.openInputStream()
+        val output = stream.openOutputStream()
+        return try {
             val modeValue = 0x8000 or mode.toInt(8)
             val pathAndMode = "$remotePath,$modeValue".toByteArray(Charsets.UTF_8)
             sendSyncHeader(output, "SEND", pathAndMode.size)
@@ -329,17 +327,10 @@ object WirelessAdbManager {
             val modifiedSeconds = (source.lastModified() / 1_000L).toInt()
             sendSyncHeader(output, "DONE", modifiedSeconds)
             output.flush()
-            val syncResult = readSyncResponse(input)
-            if (syncResult.code != 0) {
-                return syncResult
-            }
+            readSyncResponse(input)
         } finally {
-            runCatching { syncStream.close() }
+            runCatching { stream.close() }
         }
-
-        // 推送成功后，再开一个 shell 补一次 chmod
-        val chmodStream = manager.openStream("shell:chmod $mode ${shellQuote(remotePath)}")
-        return readCommandResult(chmodStream, allowStreamClose = false)
     }
 
     private fun sendSyncHeader(output: java.io.OutputStream, id: String, value: Int) {
