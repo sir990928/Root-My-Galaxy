@@ -305,10 +305,12 @@ object WirelessAdbManager {
         remotePath: String,
         mode: String,
     ): WirelessAdbCommandResult {
-        val stream = WirelessAdbConnectionManager.getInstance(context).openStream(LocalServices.SYNC)
-        val input = stream.openInputStream()
-        val output = stream.openOutputStream()
-        return try {
+        val manager = WirelessAdbConnectionManager.getInstance(context)
+        val syncStream = manager.openStream(LocalServices.SYNC)
+        val input = syncStream.openInputStream()
+        val output = syncStream.openOutputStream()
+
+        try {
             val modeValue = 0x8000 or mode.toInt(8)
             val pathAndMode = "$remotePath,$modeValue".toByteArray(Charsets.UTF_8)
             sendSyncHeader(output, "SEND", pathAndMode.size)
@@ -329,18 +331,15 @@ object WirelessAdbManager {
             output.flush()
             val syncResult = readSyncResponse(input)
             if (syncResult.code != 0) {
-                return@try syncResult
+                return syncResult
             }
-
-            // 文件推送完成后，在关闭 sync 流之前补一次 chmod，
-            // 确保远端 helper / ksud / exploit 真正拿到目标权限
-            runCatching { stream.close() }
-            val chmodStream = WirelessAdbConnectionManager.getInstance(context)
-                .openStream("shell:chmod $mode ${shellQuote(remotePath)}")
-            readCommandResult(chmodStream, allowStreamClose = false)
         } finally {
-            runCatching { stream.close() }
+            runCatching { syncStream.close() }
         }
+
+        // 推送成功后，再开一个 shell 补一次 chmod
+        val chmodStream = manager.openStream("shell:chmod $mode ${shellQuote(remotePath)}")
+        return readCommandResult(chmodStream, allowStreamClose = false)
     }
 
     private fun sendSyncHeader(output: java.io.OutputStream, id: String, value: Int) {
