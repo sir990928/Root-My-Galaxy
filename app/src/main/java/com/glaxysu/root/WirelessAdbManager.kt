@@ -70,7 +70,7 @@ class WirelessAdbPairingRequiredException(cause: Throwable? = null) :
     IOException("Wireless debugging needs to be paired once in Settings", cause)
 
 object WirelessAdbManager {
-    const val REMOTE_HELPER_PATH = "/data/local/tmp/libcve43499root.so"
+    const val REMOTE_HELPER_PATH = "/data/local/tmp/cve-2026-43499-root"
 
     private const val CONNECTION_TIMEOUT_MILLIS = 8_000L
     private const val PAIRING_DISCOVERY_TIMEOUT_MILLIS = 15_000L
