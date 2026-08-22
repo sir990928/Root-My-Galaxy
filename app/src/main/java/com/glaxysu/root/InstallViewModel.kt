@@ -108,7 +108,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 updateHistoryProfile(profile.profileId)
 
                 setPhase(InstallPhase.Downloading, app.getString(R.string.status_downloading_payload))
-                val payloads = repository.download(profile) { appendLog("[*] $it") }
+                val payloads = repository.download(profile, adbMode = wirelessExecution) { appendLog("[*] $it") }
                 appendLog(app.getString(R.string.log_download_verified))
                 stageBootstrapHelper()
                 val bootstrapRootReady = checkBootstrapRootOnBothRoutes()

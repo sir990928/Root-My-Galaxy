@@ -15,6 +15,7 @@ data class TargetProfile(
     val models: Set<String>, val kernelVersions: Set<String>,
     val exploit: RemoteArtifact, val managers: Map<String, ManagerInfo>,
     val kernelSu: RemoteArtifact = RemoteArtifact(""),
+    val exploitAdb: RemoteArtifact? = null,
 ) {
     fun matches(snapshot: DeviceSnapshot) = models.any { it.equals(snapshot.model, ignoreCase = true) } && snapshot.kernelVersion in kernelVersions
     fun matchesDevice(snapshot: DeviceSnapshot) = models.any { it.equals(snapshot.model, ignoreCase = true) }
@@ -32,6 +33,8 @@ data class SupportManifest(val targets: List<TargetProfile>) {
                 for (i in 0 until payloads.length()) {
                     val p = payloads.getJSONObject(i)
                     val e = p.getJSONObject("exploit")
+                    val localUrl = e.optString("localUrl").takeIf { it.isNotBlank() } ?: e.getString("url")
+                    val adbUrl = e.optString("adbUrl").takeIf { it.isNotBlank() }
                     val mgrJson = p.optJSONObject("managers") ?: JSONObject()
                     val mgrMap = buildMap {
                         for (k in mgrJson.keys()) {
@@ -44,7 +47,7 @@ data class SupportManifest(val targets: List<TargetProfile>) {
                     val kernelSu = if (ks != null) RemoteArtifact(ks.getString("url"), ks.getLong("size")) else RemoteArtifact("")
                     add(TargetProfile(p.getString("payloadId"), p.getString("displayName"),
                         p.getJSONArray("models").strings(), p.getJSONArray("kernelVersions").strings(),
-                        RemoteArtifact(e.getString("url")), mgrMap, kernelSu))
+                        RemoteArtifact(localUrl), mgrMap, kernelSu, adbUrl?.let { RemoteArtifact(it) }))
                 }
             }
             return SupportManifest(list)

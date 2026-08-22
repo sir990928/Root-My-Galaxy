@@ -29,11 +29,26 @@ class PayloadRepository(private val context: Context) {
         .firstOrNull { it.profileId == profileId }
         ?: error(context.getString(R.string.repo_profile_missing, profileId))
 
-    fun download(profile: TargetProfile, onProgress: (String) -> Unit): VerifiedPayloads {
+    fun download(
+        profile: TargetProfile,
+        adbMode: Boolean,
+        onProgress: (String) -> Unit,
+    ): VerifiedPayloads {
         val directory = File(context.filesDir, "payloads/${profile.profileId}").apply { mkdirs() }
-        
-        val exploit = downloadArtifact(profile.exploit, File(directory, "cve-2026-43499-app.so"), context.getString(R.string.artifact_exploit), onProgress)
-        
+
+        val exploitArtifact = if (adbMode) {
+            profile.exploitAdb ?: profile.exploit
+        } else {
+            profile.exploit
+        }
+
+        val exploit = downloadArtifact(
+            exploitArtifact,
+            File(directory, "cve-2026-43499-app.so"),
+            context.getString(R.string.artifact_exploit),
+            onProgress,
+        )
+
         val manager = AppPreferences.rootManager(context)
         val managerInfo = profile.managers[manager.manifestKey]
             ?: error("Missing ${manager.manifestKey} manager in support manifest")
@@ -41,14 +56,14 @@ class PayloadRepository(private val context: Context) {
             "Missing ${manager.manifestKey} ksudUrl in support manifest"
         }
         val ksudName = artifactFileName(managerInfo.ksudUrl, "${manager.manifestKey}-ksud")
-        
+
         val kernelSu = downloadArtifact(
             RemoteArtifact(managerInfo.ksudUrl),
             File(directory, ksudName),
             managerInfo.name,
             onProgress,
         )
-        
+
         var kernelModule: File? = null
         if (managerInfo.needsKo) {
             val koUrl = managerInfo.koUrl
@@ -61,7 +76,7 @@ class PayloadRepository(private val context: Context) {
                 onProgress,
             ).also { Os.chmod(it.absolutePath, 0b100100100) }
         }
-        
+
         Os.chmod(exploit.absolutePath, 0b100100100)
         Os.chmod(kernelSu.absolutePath, 0b100100100)
         return VerifiedPayloads(profile, exploit, kernelSu, kernelModule)
