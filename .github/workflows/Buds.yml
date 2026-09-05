@@ -1,0 +1,81 @@
+name: Build BudBuddy（复用本仓库签名）
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-budbuddy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 拉取 BudBuddy 源码
+        run: |
+          git clone --depth 1 https://github.com/sir990928/BudBuddy.git budbuddy
+
+      - name: 配置 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: gradle
+
+      - name: 还原签名 keystore
+        env:
+          SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
+        run: |
+          echo "$SIGNING_KEYSTORE" | base64 -d > release.jks
+
+      - name: 安装 Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          accept-licenses: true
+
+      - name: 打包 BudBuddy Release APK
+        working-directory: budbuddy
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleGithubRelease --no-daemon --stacktrace --no-configuration-cache
+
+      - name: 自动签名并对齐 APK
+        run: |
+          APK=$(ls budbuddy/app/build/outputs/apk/github/release/*.apk | grep -v aligned | head -1)
+          ALIGNED_APK="${APK%.apk}-aligned.apk"
+          FINAL_APK="${APK/-unsigned/}"
+
+          echo "原始 APK: $APK"
+          echo "最终 APK: $FINAL_APK"
+
+          ZIPALIGN=$(find $ANDROID_HOME/build-tools -name zipalign | sort | tail -1)
+          echo "zipalign: $ZIPALIGN"
+          $ZIPALIGN -v -p 4 "$APK" "$ALIGNED_APK"
+
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort | tail -1)
+          echo "apksigner: $APKSIGNER"
+
+          $APKSIGNER sign \
+            --ks release.jks \
+            --ks-pass pass:"${{ secrets.SIGNING_KEYSTORE_PASSWORD }}" \
+            --ks-key-alias "${{ secrets.SIGNING_KEY_ALIAS }}" \
+            --key-pass pass:"${{ secrets.SIGNING_KEY_PASSWORD }}" \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            "$ALIGNED_APK"
+
+          $APKSIGNER verify --verbose "$ALIGNED_APK"
+
+          rm -f "$APK"
+          mv "$ALIGNED_APK" "$FINAL_APK"
+
+          echo "✅ 签名和对齐完成"
+
+      - name: 上传 BudBuddy APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BudBuddy-Signed-Release
+          retention-days: 30
+          if-no-files-found: error
+          path: budbuddy/app/build/outputs/apk/github/release/*.apk
+
+      - name: 清理密钥文件
+        if: always()
+        run: rm -f release.jks
